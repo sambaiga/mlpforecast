@@ -47,6 +47,8 @@ class TimeSeriesDataset(torch.utils.data.Dataset):
         target = self.targets[index]
 
         return features, target
+
+
 class TimeseriesDataModule(pl.LightningDataModule):
     """
     A PyTorch Lightning DataModule for handling time series data.

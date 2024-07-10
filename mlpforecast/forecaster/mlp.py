@@ -5,6 +5,7 @@ import logging
 import torchmetrics
 from mlpforecast.model.point_forecast import MLPForecastModel
 from mlpforecast.forecaster.common import PytorchForecast
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")
 
@@ -12,7 +13,7 @@ logger = logging.getLogger("MLPF")
 class MLPForecast(PytorchForecast):
     def __init__(
         self,
-        hparams:dict,
+        hparams: dict,
         exp_name="Tanesco",
         file_name: str = None,
         seed: int = 42,
@@ -43,7 +44,7 @@ class MLPForecast(PytorchForecast):
 
         if hparams is None:
             hparams = {
-                "data_pipeline":None,
+                "data_pipeline": None,
                 "target_series": ["NetLoad"],
                 "unknown_features": [],
                 "known_calender_features": [],
@@ -53,8 +54,8 @@ class MLPForecast(PytorchForecast):
                 "combination_type": "additional",
                 "hidden_size": 256,
                 "num_layers": 2,
-                'expansion_factor':2,
-                "residual":  False,
+                "expansion_factor": 2,
+                "residual": False,
                 "forecast_horizon": 48,
                 "input_window_size": 96,
                 "activation_function": "SiLU",
@@ -63,14 +64,12 @@ class MLPForecast(PytorchForecast):
                 "alpha": 0.25,
                 "metric": "mae",
                 "num_attention_heads": 4,
-                "learning_rate":1e-3,
-                "weight_decay":1e-6,
-                "prob_decay_1":0.75,
-                "prob_decay_2":0.9,
-                "gamma":0.01,
-                "max_epochs":10,
+                "learning_rate": 1e-3,
+                "weight_decay": 1e-6,
+                "prob_decay_1": 0.75,
+                "prob_decay_2": 0.9,
+                "gamma": 0.01,
+                "max_epochs": 10,
             }
 
         self.model = MLPForecastModel(**hparams)
-
-    

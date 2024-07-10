@@ -254,7 +254,8 @@ class PastFutureEncoder(nn.Module):
         x = self.encoder(x)
 
         return x
-    
+
+
 class MLPForecastNetwork(nn.Module):
     def __init__(
         self,
@@ -460,6 +461,6 @@ class MLPForecastNetwork(nn.Module):
         loss = loss.sum(1).mean()
 
         # Compute the specified metric
-        metric=metric_fn(y_pred, y)
+        metric = metric_fn(y_pred, y)
 
         return loss, metric

@@ -3,6 +3,7 @@ import glob
 from pathlib import Path
 from timeit import default_timer
 import logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Forecaster")
 import pytorch_lightning as pl
@@ -17,8 +18,6 @@ from pytorch_lightning.callbacks import (
 from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
 from pytorch_lightning import loggers
 from mlpforecast.data.loader import TimeseriesDataModule
-
-
 
 
 def get_latest_checkpoint(checkpoint_path):
@@ -60,7 +59,7 @@ class PytorchForecast:
         wandb=False,
         model_type="MLPF",
         rich_progress_bar=False,
-        gradient_clip_val=10
+        gradient_clip_val=10,
     ):
         """
         Initializes the PytorchForecast class with the given parameters.
@@ -90,8 +89,8 @@ class PytorchForecast:
         self.rich_progress_bar = rich_progress_bar
         self.model_type = "default_model"  # Update with actual model type
         self.model = None
-        self.datamodule =None
-        self.gradient_clip_val=gradient_clip_val
+        self.datamodule = None
+        self.gradient_clip_val = gradient_clip_val
         self._create_folder()
 
     def _create_folder(self):
@@ -123,9 +122,7 @@ class PytorchForecast:
         callback = []
         pl.seed_everything(self.seed, workers=True)
         if self.trial is not None:
-            self.logger = (
-                True  # DictLogger(self.logs,  version=self.trial.number)
-            )
+            self.logger = True  # DictLogger(self.logs,  version=self.trial.number)
             early_stopping = PyTorchLightningPruningCallback(
                 self.trial, monitor=self.metric
             )
@@ -144,9 +141,7 @@ class PytorchForecast:
 
                 self.logger = loggers.TensorBoardLogger(
                     save_dir=self.logs,
-                    version=(
-                        self.file_name if self.file_name is not None else 0
-                    ),
+                    version=(self.file_name if self.file_name is not None else 0),
                 )
             else:
                 self.logger = loggers.WandbLogger(
@@ -197,14 +192,20 @@ class PytorchForecast:
             devices=1,
         )
 
-    def fit(self, train_df, val_df=None, train_ratio=0.80, drop_last=False,
+    def fit(
+        self,
+        train_df,
+        val_df=None,
+        train_ratio=0.80,
+        drop_last=False,
         num_worker=1,
         batch_size=64,
-        pin_memory=True):
+        pin_memory=True,
+    ):
 
         if self.model is None:
             raise ValueError(f"Model instance is empty")
-        
+
         self.model.data_pipeline.fit(train_df.copy())
 
         if val_df is None and train_ratio > 0.0:
@@ -213,12 +214,12 @@ class PytorchForecast:
                 train_df.iloc[int(train_ratio * len(train_df)) :],
             )
             self.metric = f"val_{self.model.hparams['metric']}"
-            val_feature, val_target=self.model.data_pipeline.transform(val_df)
+            val_feature, val_target = self.model.data_pipeline.transform(val_df)
         else:
-            val_feature, val_target=None, None
+            val_feature, val_target = None, None
             self.metric = f"train_{self.model.hparams['metric']}"
 
-        train_feature, train_target=self.model.data_pipeline.transform(train_df)
+        train_feature, train_target = self.model.data_pipeline.transform(train_df)
         self.datamodule = TimeseriesDataModule(
             train_inputs=train_feature,
             train_targets=train_target,
@@ -229,7 +230,6 @@ class PytorchForecast:
             batch_size=batch_size,
             pin_memory=pin_memory,
         )
-
 
         self._set_up_trainer()
         start_time = default_timer()
@@ -256,5 +256,3 @@ class PytorchForecast:
             logging.info(f"""training complete after {train_walltime/60} minutes""")
 
             return train_walltime
-
-        

@@ -3,6 +3,7 @@ import pytorch_lightning as pl
 import logging
 import torchmetrics
 from mlpforecast.net.layers import MLPForecastNetwork
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")
 
@@ -157,7 +158,7 @@ class MLPForecastModel(pl.LightningModule):
         else:
             raise ValueError("Invalid metric. Please select 'mae', 'smape', 'mse'.")
         self.save_hyperparameters()
-    
+
     def forecast(self, x):
         return self.model.forecast(x)
 
