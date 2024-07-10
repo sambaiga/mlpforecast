@@ -3,10 +3,29 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+
+# Ignore virtual environments
+env/
+venv/
+
+# Ignore poetry lock file
+poetry.lock
+
 # C extensions
 *.so
 
-*.DS_Store
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.swo
+.env
+*.env
+.DS_Store
+*.log
+*.bak
+*.tmp
+*.lock
 
 # Distribution / packaging
 .Python
@@ -84,6 +103,9 @@ target/
 profile_default/
 ipython_config.py
 
+
+# Ignore ruff_cache directory
+.ruff_cache/
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
 #   intended to run in multiple environments; otherwise, check them in:
