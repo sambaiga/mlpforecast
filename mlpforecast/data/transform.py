@@ -10,107 +10,143 @@ from sklearn.base import BaseEstimator, OneToOneFeatureMixin, TransformerMixin
 from mlpforecast.data.processing import  combine_past_future_exogenous, fourier_series_t, compute_netload_ghi, get_n_sample_per_day
 from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
-
 class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
+    """
+    A class to handle dataset preprocessing for time series forecasting, including lag and rolling window feature
+    augmentation, scaling, and feature extraction.
 
+    Attributes:
+        target_series (list): List of target series to forecast.
+        unknown_features (list): List of unknown features.
+        calender_variable (list): List of calendar variables.
+        known_calender_features (list): List of known calendar features.
+        known_continuous_features (list): List of known continuous features.
+        input_scaler (object): Scaler for input features (default is MinMaxScaler).
+        target_scaler (object): Scaler for target features (default is MinMaxScaler).
+        lags (list): List of lag values for feature augmentation.
+        window (list): List of window sizes for rolling window calculations.
+        window_func (list): List of window functions for rolling window calculations.
+        period (str): Period of the time series data.
+        input_window_size (int): Size of the input window.
+        forecast_horizon (int): Forecast horizon.
+        date_column (str): Name of the date column.
+    """
+    
+    def __init__(self, target_series=["NetLoad"],
+                 unknown_features=[],
+                 calender_variable=[],
+                 known_calender_features=[],
+                 known_continuous_features=[],
+                 input_scaler=MinMaxScaler(),
+                 target_scaler=MinMaxScaler(),
+                 lags=[1 * 48, 7 * 48],
+                 window=[1 * 48, 7 * 48],
+                 window_func=["mean"],
+                 period="30min",
+                 input_window_size=96,
+                 forecast_horizon=48,
+                 date_column="timestamp"):
+        """
+        Initializes the DatasetObjective with the specified parameters.
 
-    def __init__(self, target_series = ["NetLoad"],
-                unknown_features = [],
-                calender_variable=[],
-                known_calender_features = [],
-                known_continuous_features = [],
-                add_ghi = False,  
-                scaler = MinMaxScaler(),
-                target_scaler = MinMaxScaler(), 
-                lags=[1 * 48, 7 * 48],
-                window=[1 * 48, 7 * 48],
-                window_func=["mean"],
-                period="30min",
-                input_window_size=96,
-                forecast_horizon=48,
-                date_column="timestamp"):
+        Args:
+            target_series (list or str): List of target series to forecast. If a single string, it will be converted to a list.
+            unknown_features (list): List of unknown features.
+            calender_variable (list): List of calendar variables.
+            known_calender_features (list): List of known calendar features.
+            known_continuous_features (list): List of known continuous features.
+            input_scaler (object): Scaler for input features (default is MinMaxScaler).
+            target_scaler (object): Scaler for target features (default is MinMaxScaler).
+            lags (list): List of lag values for feature augmentation.
+            window (list): List of window sizes for rolling window calculations.
+            window_func (list): List of window functions for rolling window calculations.
+            period (str): Period of the time series data (default is "30min").
+            input_window_size (int): Size of the input window (default is 96).
+            forecast_horizon (int): Forecast horizon (default is 48).
+            date_column (str): Name of the date column (default is "timestamp").
+
+        Raises:
+            ValueError: If target_series is not a string or list of strings.
+        """
         
         if isinstance(target_series, str):
             target_series = [target_series]
-
         elif not isinstance(target_series, list):
             raise ValueError(f"{target_series} should be a string or a list of strings.")
 
-        n_samples = get_n_sample_per_day(period)
-        self.scaler = scaler
-        self.target_transformer = target_scaler
-        self.installed_capacity=np.abs(self.target).max(0)
+        
         self.numerical_features = unknown_features + known_continuous_features
-        self.calender_variable=calender_variable
-        self.date_column=date_column
+        self.calender_variable = calender_variable
+        self.date_column = date_column
         self.target_series = target_series
         self.unknown_features = unknown_features
-        self.calender_variable=calender_variable
         self.known_calender_features = known_calender_features
         self.known_continuous_features = known_continuous_features
-        self.input_window_size=input_window_size
-        self.forecast_horizon=forecast_horizon
-
+        self.input_window_size = input_window_size
+        self.forecast_horizon = forecast_horizon
+        self.input_scaler = input_scaler
+        self.target_scaler = target_scaler
+        self.lags = lags
+        self.window = window
+        self.window_func = window_func
+        self.period=period
+        self.exog_periods=None
+        self.n_samples = get_n_sample_per_day(self.period)
 
         steps = []
-        transformers=[]
-    
-        if (lags is not None) and (len(lags) > 0):
 
-            lags = [int(l * n_samples) for l in sorted(lags)]
-
+        if (self.lags is not None) and (len(self.lags) > 0):
+            lags_scaled = [int(l * self.n_samples) for l in sorted(self.lags)]
             transformer_lags = FunctionTransformer(
                 tk.augment_lags,
                 kw_args={
                     "date_column": date_column,
                     "value_column": target_series,
-                    "lags": lags,
+                    "lags": lags_scaled,
                 },
             )
             steps += [("lags_step", transformer_lags)]
 
-            self.numerical_features+=[f"{value}_lag_{lag}" for value in target_series for lag in lags]
-
-        if (window is not None) and (len(window) > 0):
-
-            window = [int(l * n_samples) for l in sorted(window)]
-
+        if (self.window is not None) and (len(self.window) > 0):
+            window_scaled = [int(w * self.n_samples) for w in sorted(self.window)]
             transformer_rolling = FunctionTransformer(
                 tk.augment_rolling,
                 kw_args={
                     "date_column": date_column,
                     "window_func": window_func,
                     "value_column": target_series,
-                    "window": window,
+                    "window": window_scaled,
                 },
             )
             steps += [("rolling_step", transformer_rolling)]
-            
-            self.numerical_features+=[f"{value}_rolling_mean_{w}" for value in target_series for w in window]
 
+        steps += [("dropnan_step", FunctionTransformer(lambda x: x.dropna()))]
+        feature_pipeline = Pipeline(steps=steps)
 
-        if len(steps)>0:
-            steps += [("dropnan_step", FunctionTransformer(lambda x: x.dropna()))]
-            transformers+= [("AR", Pipeline(steps=steps), target_series)]
-            
-
+        transformers = []
         if len(self.numerical_features) > 0:
-            input_scaler = StandardScaler() if input_scaler is None else input_scaler
-            numeric_transformer = Pipeline(steps=[("scaler", input_scaler)])
+            numeric_transformer = Pipeline(steps=[("scaler", self.input_scaler)])
             transformers += [("feat_scaler", numeric_transformer, self.numerical_features)]
 
-        target_transformer = Pipeline(steps=[("target_scaler", target_scaler)])
+        target_transformer = Pipeline(steps=[("target_scaler", self.target_scaler)])
         transformers += [("target_scaler", target_transformer, target_series)]
-        self.data_pipeline = ColumnTransformer(
-                                transformers=transformers,
-                                remainder="passthrough",
-                                verbose_feature_names_out=False,
-                            )
+        
+        data_pipeline = ColumnTransformer(
+            transformers=transformers,
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        )
+        # Set output transform to pandas format
+        data_pipeline.set_output(transform="pandas")
+
+        self.data_pipeline = Pipeline(steps=[('feature_extraction', feature_pipeline),
+                                             ('scaling', data_pipeline)])
 
 
 
     def fit(self, data, y=None):
         self.data_pipeline.fit(data)
+        
         if len(self.calender_variable)>0:
             exog = data[self.calender_variable].values
             self.exog_periods=[len(np.unique(exog[:, l])) for l in range(exog.shape[-1])]
@@ -120,12 +156,13 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
     def transform(self, data):
 
         data_transfomed=self.data_pipeline.transform(data.copy())
-        self.data = self.data.dropna()
-        data_transfomed = data_transfomed.sort_values(column=self.date_column)
+        data_transfomed = data_transfomed.sort_values(by=self.date_column)
 
-        if self.calender_variable>0:
+        if len(self.calender_variable)>0:
             exog = data_transfomed[self.calender_variable].astype(np.float32).values
-            seasonalities =np.hstack([fourier_series_t(exog[:,i], self.exog_periods[i], 1) for i in range(len(exog_periods))])
+            if self.exog_periods is None:
+                self.exog_periods=[len(np.unique(exog[:, l])) for l in range(exog.shape[-1])]
+            seasonalities =np.hstack([fourier_series_t(exog[:,i], self.exog_periods[i], 1) for i in range(len(self.exog_periods))])
             for i, col in enumerate(self.calender_variable):
                 data_transfomed[f'{col}-sin']=seasonalities[:, i]
                 data_transfomed[f'{col}-cosin']=seasonalities[:, i]+seasonalities[:, i+1]
@@ -174,8 +211,9 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             (self.forecast_horizon, targets.shape[1]),
         ),
         axis=1)
+        targets = targets.reshape(targets.shape[0], self.forecast_horizon, -1)
         features =combine_past_future_exogenous(features, future_exogenous)
-        targets = self.targets.reshape(self.targets.shape[0], self.forecast_horizon, -1)
+        
         return features, targets
         
    

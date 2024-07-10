@@ -2,130 +2,116 @@ from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torch
 import numpy as np
 import pytorch_lightning as pl
-from tqdm import tqdm
-
-class TimeSeriesDataset(object):   
-    def __init__(self, unknown_features, kown_features, targets, window_size=96, horizon=48, batch_size=64, shuffle=False, test=False, drop_last=True):
-        self.inputs = unknown_features
-        self.covariates = kown_features
-        self.targets = targets
-        self.window_size = window_size
-        self.horizon = horizon
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-        self.test = test
-        self.drop_last= drop_last
-        
-    def frame_series(self):
-        
-        nb_obs, nb_features = self.inputs.shape
-        features, targets, covariates = [], [], []
-        
-
-        list_range = range(0, nb_obs - self.window_size - self.horizon+1, self.horizon) if self.test else range(0, nb_obs - self.window_size - self.horizon+1)
-        with tqdm(len(list_range)) as pbar:
-            for i in list_range:
-                features.append(torch.FloatTensor(self.inputs[i:i + self.window_size, :]).unsqueeze(0))
-                targets.append(
-                        torch.FloatTensor(self.targets[i + self.window_size:i + self.window_size + self.horizon]).unsqueeze(0))
-                covariates.append(
-                        torch.FloatTensor(self.covariates[i + self.window_size:i + self.window_size + self.horizon,:]).unsqueeze(0))
-
-                pbar.set_description('processed: %d' % (1 + i))
-                pbar.update(1)
-            pbar.close() 
-
-        features = torch.cat(features)
-        targets, covariates = torch.cat(targets), torch.cat(covariates)
-        
-        
-        
-        #padd covariate features with zero
-        diff = features.shape[2] - covariates.shape[2]
-        B, N, _ = covariates.shape
-        diff = torch.zeros(B, N, diff, requires_grad=False)
-        covariates = torch.cat([diff, covariates], dim=-1)
-        features = torch.cat([features, covariates], dim=1)
-        
-        del covariates
-        del diff
-        
-       
-
-        return TensorDataset(features,  targets)
-        
-    def get_loader(self):
-        dataset = self.frame_series()
-        loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=self.shuffle, drop_last=self.drop_last, num_workers=8, pin_memory=True)
-        return loader
 
 
-class TimeSeriesLazyDataset(Dataset):   
-    def __init__(self, unknown_features, kown_features, targets, window_size=96, horizon=48):
-        self.inputs = torch.FloatTensor(unknown_features)
-        self.covariates = torch.FloatTensor(kown_features)
-        self.targets = torch.FloatTensor(targets)
-        self.window_size = window_size
-        self.horizon = horizon
-        
-        
+class TimeSeriesDataset(torch.utils.data.Dataset):
+    """
+    A PyTorch Dataset for lazy loading of time series data.
+
+    This dataset handles time series data by storing the inputs and targets as
+    tensors. It provides the necessary methods to retrieve the length of the dataset
+    and individual data points.
+
+    Parameters:
+    - inputs (np.array): A numpy array of input features. Expected shape is (num_samples, num_features).
+    - targets (np.array): A numpy array of target values. Expected shape is (num_samples, target_dim).
+
+    Methods:
+    - __len__(): Returns the number of samples in the dataset.
+    - __getitem__(index): Returns the input features and target for a given index.
+
+    Usage:
+    >>> dataset = TimeSeriesLazyDataset(inputs, targets)
+    >>> len(dataset)
+    >>> features, target = dataset[index]
+
+    Attributes:
+    - inputs (torch.FloatTensor): The input features stored as a PyTorch FloatTensor.
+    - targets (torch.FloatTensor): The target values stored as a PyTorch FloatTensor.
+    """
+
+    def __init__(
+        self,
+        inputs: np.array,
+        targets: np.array,
+    ):
+
+        self.inputs = torch.FloatTensor(inputs.copy())
+        self.targets = torch.FloatTensor(targets.copy())
+
     def __len__(self):
-        return self.inputs.shape[0]-self.window_size-self.horizon
-    
+        return self.inputs.shape[0]
+
     def __getitem__(self, index):
-        features = self.inputs[index:index + self.window_size]
-        target = self.targets[index+self.window_size:index+self.window_size+self.horizon]
-        covariates = self.covariates[index+self.window_size:index+self.window_size+self.horizon]
-        
-        #padd covariate features with zero
-        diff = features.shape[1] - covariates.shape[1]
-        N, _ = covariates.shape
-        diff = torch.zeros(N, diff, requires_grad=False)
-        covariates = torch.cat([diff, covariates], dim=-1)
-        features = torch.cat([features, covariates], dim=0)
-        del covariates
-        del diff
+        features = self.inputs[index]
+        target = self.targets[index]
+
         return features, target
-            
-
 class TimeseriesDataModule(pl.LightningDataModule):
-    def __init__(self, hparams, experiment, train_df, test_df, test=False):
-        super().__init__()
-       
-        target, known_features, unkown_features = experiment.get_data(data=train_df)
-        if test:
-            self.train_dataset = TimeSeriesDataset(unkown_features, known_features, target, window_size=hparams['window_size'], horizon=hparams['horizon'],
-                                                    batch_size=hparams['batch_size'], shuffle=True, test=False, drop_last=True)
-        else:
-            self.train_dataset = TimeSeriesLazyDataset(unkown_features, known_features, target, window_size=hparams['window_size'], horizon=hparams['horizon'])
-      
+    """
+    A PyTorch Lightning DataModule for handling time series data.
 
-        target, known_features, unkown_features = experiment.get_data(data=test_df)
-        
-        if test:
-            self.test_dataset = TimeSeriesDataset(unkown_features, known_features, target, window_size=hparams['window_size'], horizon=hparams['horizon'],
-                                                    batch_size=hparams['batch_size'], shuffle=False, test=False, drop_last=False)
+    This DataModule prepares the data loaders for training and validation datasets.
+
+    Parameters:
+    - train_inputs (np.array): A numpy array of training input features.
+    - train_targets (np.array): A numpy array of training target values.
+    - val_inputs (np.array, optional): A numpy array of validation input features. Default is None.
+    - val_targets (np.array, optional): A numpy array of validation target values. Default is None.
+    - drop_last (bool, optional): Whether to drop the last incomplete batch in each epoch. Default is True.
+    - num_worker (int, optional): Number of worker processes for data loading. Default is 1.
+    - batch_size (int, optional): Number of samples per batch to load. Default is 64.
+    - pin_memory (bool, optional): Whether to pin memory during data loading. Default is True.
+
+    Methods:
+    - train_dataloader(): Returns the DataLoader for the training dataset.
+    - val_dataloader(): Returns the DataLoader for the validation dataset if it exists, otherwise returns None.
+    """
+
+    def __init__(
+        self,
+        train_inputs: np.array,
+        train_targets: np.array,
+        val_inputs: np.array = None,
+        val_targets: np.array = None,
+        drop_last: bool = True,
+        num_worker: int = 1,
+        batch_size: int = 64,
+        pin_memory: bool = True,
+    ):
+        super().__init__()
+        self.train_dataset = TimeSeriesDataset(
+            inputs=train_inputs, targets=train_targets
+        )
+
+        if val_inputs is not None:
+            self.val_dataset = TimeSeriesDataset(inputs=val_inputs, targets=val_targets)
         else:
-            self.test_dataset = TimeSeriesLazyDataset(unkown_features, known_features, target, window_size=hparams['window_size'], horizon=hparams['horizon'])
-        del target
-        del known_features
-        del unkown_features
-        self.batch_size=hparams['batch_size']
-        self.test = test
+            self.val_dataset = None
+        self.drop_last = drop_last
+        self.num_worker = num_worker
+        self.pin_memory = pin_memory
+        self.batch_size = batch_size
 
     def train_dataloader(self):
-        if self.test:
-            return self.train_dataset.get_loader()
-        else:
-            return torch.utils.data.DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, drop_last=True, num_workers=8, pin_memory=True)
+        return torch.utils.data.DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            drop_last=self.drop_last,
+            num_workers=self.num_worker,
+            pin_memory=self.pin_memory,
+        )
 
     def val_dataloader(self):
-        if self.test:
-            return self.test_dataset.get_loader()
+        if self.val_dataset is not None:
+            return torch.utils.data.DataLoader(
+                self.val_dataset,
+                batch_size=self.batch_size,
+                shuffle=False,
+                drop_last=self.drop_last,
+                num_workers=self.num_worker,
+                pin_memory=self.pin_memory,
+            )
         else:
-            return torch.utils.data.DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, drop_last=True, num_workers=8, pin_memory=True)
-
-
-
-
-
+            return None

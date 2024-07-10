@@ -11,6 +11,7 @@ class MLPForecastModel(pl.LightningModule):
 
     def __init__(
         self,
+        data_pipeline,
         target_series,
         unknown_features=[],
         known_calender_features=[],
@@ -110,7 +111,7 @@ class MLPForecastModel(pl.LightningModule):
         n_unknown = len(unknown_features) + self.n_out
         n_covariates = len(known_calender_features) + len(known_continuous_features)
         self.n_channels = n_unknown + n_covariates
-
+        self.data_pipeline = data_pipeline
         self.model = MLPForecastNetwork(
             n_target_series=len(target_series),
             n_unknown_features=len(unknown_features),

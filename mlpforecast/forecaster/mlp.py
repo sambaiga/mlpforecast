@@ -12,7 +12,7 @@ logger = logging.getLogger("MLPF")
 class MLPForecast(PytorchForecast):
     def __init__(
         self,
-        hparams,
+        hparams:dict,
         exp_name="Tanesco",
         file_name: str = None,
         seed: int = 42,
@@ -25,8 +25,8 @@ class MLPForecast(PytorchForecast):
         future_exogenous=True,
         scaler=None,
         target_scaler=None,
+        gradient_clip_val=10,
         rich_progress_bar: bool = True,
-        kwargs=None,
     ):
         super().__init__(
             file_name=file_name,
@@ -37,11 +37,13 @@ class MLPForecast(PytorchForecast):
             max_epochs=max_epochs,
             wandb=wandb,
             model_type=model_type,
+            gradient_clip_val=gradient_clip_val,
             rich_progress_bar=rich_progress_bar,
         )
 
         if hparams is None:
             hparams = {
+                "data_pipeline":None,
                 "target_series": ["NetLoad"],
                 "unknown_features": [],
                 "known_calender_features": [],
@@ -69,4 +71,6 @@ class MLPForecast(PytorchForecast):
                 "max_epochs":10,
             }
 
-        self.model = MLPForecastModel(hparams)
+        self.model = MLPForecastModel(**hparams)
+
+    

@@ -2,7 +2,9 @@ from __future__ import annotations
 import glob
 from pathlib import Path
 from timeit import default_timer
-
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("Forecaster")
 import pytorch_lightning as pl
 from optuna_integration.pytorch_lightning import PyTorchLightningPruningCallback
 from pytorch_lightning.callbacks import (
@@ -14,6 +16,7 @@ from pytorch_lightning.callbacks import (
 )
 from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
 from pytorch_lightning import loggers
+from mlpforecast.data.loader import TimeseriesDataModule
 
 
 
@@ -57,7 +60,7 @@ class PytorchForecast:
         wandb=False,
         model_type="MLPF",
         rich_progress_bar=False,
-        gradient_clip_val=None
+        gradient_clip_val=10
     ):
         """
         Initializes the PytorchForecast class with the given parameters.
@@ -87,6 +90,7 @@ class PytorchForecast:
         self.rich_progress_bar = rich_progress_bar
         self.model_type = "default_model"  # Update with actual model type
         self.model = None
+        self.datamodule =None
         self.gradient_clip_val=gradient_clip_val
         self._create_folder()
 
@@ -130,7 +134,7 @@ class PytorchForecast:
             early_stopping = EarlyStopping(
                 monitor=self.metric,
                 min_delta=0.0,
-                patience=int(self.hparams["max_epochs"] * 0.5),
+                patience=int(self.max_epochs * 0.25),
                 verbose=False,
                 mode="min",
                 check_on_train_epoch_end=True,
@@ -186,9 +190,71 @@ class PytorchForecast:
 
         self.trainer = pl.Trainer(
             logger=self.logger,
-            gradient_clip_val=self.clipping_value,
+            gradient_clip_val=self.gradient_clip_val,
             max_epochs=self.max_epochs,
             callbacks=callback,
             accelerator="auto",
             devices=1,
         )
+
+    def fit(self, train_df, val_df=None, train_ratio=0.80, drop_last=False,
+        num_worker=1,
+        batch_size=64,
+        pin_memory=True):
+
+        if self.model is None:
+            raise ValueError(f"Model instance is empty")
+        
+        self.model.data_pipeline.fit(train_df.copy())
+
+        if val_df is None and train_ratio > 0.0:
+            train_df, val_df = (
+                train_df.iloc[: int(train_ratio * len(train_df))],
+                train_df.iloc[int(train_ratio * len(train_df)) :],
+            )
+            self.metric = f"val_{self.model.hparams['metric']}"
+            val_feature, val_target=self.model.data_pipeline.transform(val_df)
+        else:
+            val_feature, val_target=None, None
+            self.metric = f"train_{self.model.hparams['metric']}"
+
+        train_feature, train_target=self.model.data_pipeline.transform(train_df)
+        self.datamodule = TimeseriesDataModule(
+            train_inputs=train_feature,
+            train_targets=train_target,
+            val_inputs=val_feature,
+            val_targets=val_target,
+            drop_last=drop_last,
+            num_worker=num_worker,
+            batch_size=batch_size,
+            pin_memory=pin_memory,
+        )
+
+
+        self._set_up_trainer()
+        start_time = default_timer()
+        logger.info("""---------------Training started ---------------------------""")
+        if self.trial is not None:
+            self.trainer.fit(
+                self.model,
+                self.datamodule.train_dataloader(),
+                self.datamodule.val_dataloader(),
+            )
+
+            train_walltime = default_timer() - start_time
+            logging.info(f"training complete after {train_walltime/60} minutes")
+            return self.trainer.callback_metrics[self.metric].item()
+
+        else:
+            self.trainer.fit(
+                self.model,
+                self.datamodule.train_dataloader(),
+                self.datamodule.val_dataloader(),
+                ckpt_path=get_latest_checkpoint(self.checkpoints),
+            )
+            train_walltime = default_timer() - start_time
+            logging.info(f"""training complete after {train_walltime/60} minutes""")
+
+            return train_walltime
+
+        
