@@ -1,13 +1,16 @@
 from __future__ import annotations
+
 import glob
+import logging
+import os
 from pathlib import Path
 from timeit import default_timer
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Forecaster")
 import pytorch_lightning as pl
 from optuna_integration.pytorch_lightning import PyTorchLightningPruningCallback
+from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
@@ -16,7 +19,7 @@ from pytorch_lightning.callbacks import (
     TQDMProgressBar,
 )
 from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
-from pytorch_lightning import loggers
+
 from mlpforecast.data.loader import TimeseriesDataModule
 
 
@@ -138,7 +141,6 @@ class PytorchForecast:
             )
             callback.append(early_stopping)
             if not self.wandb:
-
                 self.logger = loggers.TensorBoardLogger(
                     save_dir=self.logs,
                     version=(self.file_name if self.file_name is not None else 0),
@@ -202,9 +204,8 @@ class PytorchForecast:
         batch_size=64,
         pin_memory=True,
     ):
-
         if self.model is None:
-            raise ValueError(f"Model instance is empty")
+            raise ValueError("Model instance is empty")
 
         self.model.data_pipeline.fit(train_df.copy())
 
@@ -242,7 +243,7 @@ class PytorchForecast:
             )
 
             train_walltime = default_timer() - start_time
-            logging.info(f"training complete after {train_walltime/60} minutes")
+            logging.info(f"training complete after {train_walltime / 60} minutes")
             return self.trainer.callback_metrics[self.metric].item()
 
         else:
@@ -253,6 +254,6 @@ class PytorchForecast:
                 ckpt_path=get_latest_checkpoint(self.checkpoints),
             )
             train_walltime = default_timer() - start_time
-            logging.info(f"""training complete after {train_walltime/60} minutes""")
+            logging.info(f"""training complete after {train_walltime / 60} minutes""")
 
             return train_walltime

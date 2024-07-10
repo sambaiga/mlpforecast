@@ -1,10 +1,7 @@
-import numpy as np
 from datetime import datetime
-import glob
-import calendar
-import time
+
+import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
 
 
 def get_n_sample_per_day(period):
@@ -35,7 +32,7 @@ def detect_missing_date(dataset, period=30):
 
 def get_periods_for_exog_variable(hparams, data):
     exog = data[hparams["time_varying_known_categorical_feature"]].values
-    exog_periods = [len(np.unique(exog[:, l])) for l in range(exog.shape[-1])]
+    exog_periods = [len(np.unique(exog[:, size])) for size in range(exog.shape[-1])]
     return exog_periods
 
 
@@ -117,11 +114,11 @@ def loadData(
 
     data[a_idx_field] = pd.to_datetime(data[a_idx_field], utc=True)
 
-    if a_rename != None:
+    if a_rename is not None:
         data.rename(columns=a_rename, inplace=True)
     data.set_index(a_idx_field, inplace=True)
     # data = data.interpolate(method="time")
-    if a_timezone != None:
+    if a_timezone is not None:
         data.index = data.index.tz_convert(a_timezone)
 
     # data.index = pd.to_datetime(data.index)
@@ -140,7 +137,7 @@ def day_night(x):
 
 def add_exogenous_variables(df, one_hot=False):
     """
-    Augument the dataframe with exogenous features (date/time feature + holiday feature).
+    Augment the dataframe with exogenous features (date/time feature + holiday feature).
     The feature's values can be kept as they are or they can be one hot encoded
     :param df: the dataframe
     :param one_hot: if True, one hot encode all the features.
@@ -167,10 +164,10 @@ def add_exogenous_variables(df, one_hot=False):
     data["WEEKEND"] = ((data.timestamp.dt.dayofweek) // 5 == 1).astype(float)
 
     data["SATURDAY"] = 0
-    data["SATURDAY"] = ((data.timestamp.dt.dayofweek == 5)).astype(float)
+    data["SATURDAY"] = (data.timestamp.dt.dayofweek == 5).astype(float)
 
     data["SUNDAY"] = 0
-    data["SUNDAY"] = ((data.timestamp.dt.dayofweek == 6)).astype(float)
+    data["SUNDAY"] = (data.timestamp.dt.dayofweek == 6).astype(float)
 
     if one_hot:
         ex_feat = pd.get_dummies(
@@ -221,7 +218,7 @@ def fourier_series_t(t, period, series_order):
     """
     features = np.column_stack(
         [
-            fun((2.0 * (i + 1) * np.pi * t / period))
+            fun(2.0 * (i + 1) * np.pi * t / period)
             for i in range(series_order)
             for fun in (np.sin, np.cos)
         ]
@@ -259,7 +256,6 @@ def get_index(test_df, hparams, test=True):
 
 
 def compute_netload_ghi(load, ghi, SAMPLES_PER_DAY):
-
     print("Compute load ghi feature")
     Load_ghi = []
     for i in range(SAMPLES_PER_DAY, len(load) - SAMPLES_PER_DAY, SAMPLES_PER_DAY):

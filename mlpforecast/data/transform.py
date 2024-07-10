@@ -1,18 +1,15 @@
-import pandas as pd
 import numpy as np
-import torch
 import pytimetk as tk
+from sklearn.base import BaseEstimator, OneToOneFeatureMixin, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, FunctionTransformer
-from sklearn.base import BaseEstimator, OneToOneFeatureMixin, TransformerMixin
+from sklearn.preprocessing import FunctionTransformer, MinMaxScaler
+
 from mlpforecast.data.processing import (
     combine_past_future_exogenous,
     fourier_series_t,
-    compute_netload_ghi,
     get_n_sample_per_day,
 )
-from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
 
 class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
@@ -58,7 +55,8 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         Initializes the DatasetObjective with the specified parameters.
 
         Args:
-            target_series (list or str): List of target series to forecast. If a single string, it will be converted to a list.
+            target_series (list or str): List of target series to forecast. \
+                If a single string, it will be converted to a list.
             unknown_features (list): List of unknown features.
             calender_variable (list): List of calendar variables.
             known_calender_features (list): List of known calendar features.
@@ -105,7 +103,7 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         steps = []
 
         if (self.lags is not None) and (len(self.lags) > 0):
-            lags_scaled = [int(l * self.n_samples) for l in sorted(self.lags)]
+            lags_scaled = [int(lag * self.n_samples) for lag in sorted(self.lags)]
             transformer_lags = FunctionTransformer(
                 tk.augment_lags,
                 kw_args={
@@ -117,7 +115,9 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             steps += [("lags_step", transformer_lags)]
 
         if (self.window is not None) and (len(self.window) > 0):
-            window_scaled = [int(w * self.n_samples) for w in sorted(self.window)]
+            window_scaled = [
+                int(wsize * self.n_samples) for wsize in sorted(self.window)
+            ]
             transformer_rolling = FunctionTransformer(
                 tk.augment_rolling,
                 kw_args={
@@ -160,13 +160,12 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         if len(self.calender_variable) > 0:
             exog = data[self.calender_variable].values
             self.exog_periods = [
-                len(np.unique(exog[:, l])) for l in range(exog.shape[-1])
+                len(np.unique(exog[:, size])) for size in range(exog.shape[-1])
             ]
 
         return self
 
     def transform(self, data):
-
         data_transfomed = self.data_pipeline.transform(data.copy())
         data_transfomed = data_transfomed.sort_values(by=self.date_column)
 
@@ -174,7 +173,7 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             exog = data_transfomed[self.calender_variable].astype(np.float32).values
             if self.exog_periods is None:
                 self.exog_periods = [
-                    len(np.unique(exog[:, l])) for l in range(exog.shape[-1])
+                    len(np.unique(exog[:, size])) for size in range(exog.shape[-1])
                 ]
             seasonalities = np.hstack(
                 [

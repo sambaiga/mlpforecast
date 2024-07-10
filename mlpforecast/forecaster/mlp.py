@@ -1,10 +1,9 @@
 from __future__ import annotations
-import torch
-import pytorch_lightning as pl
+
 import logging
-import torchmetrics
-from mlpforecast.model.point_forecast import MLPForecastModel
+
 from mlpforecast.forecaster.common import PytorchForecast
+from mlpforecast.model.point_forecast import MLPForecastModel
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")

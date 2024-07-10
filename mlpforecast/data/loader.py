@@ -1,7 +1,6 @@
-from torch.utils.data import DataLoader, TensorDataset, Dataset
-import torch
 import numpy as np
 import pytorch_lightning as pl
+import torch
 
 
 class TimeSeriesDataset(torch.utils.data.Dataset):
@@ -35,7 +34,6 @@ class TimeSeriesDataset(torch.utils.data.Dataset):
         inputs: np.array,
         targets: np.array,
     ):
-
         self.inputs = torch.FloatTensor(inputs.copy())
         self.targets = torch.FloatTensor(targets.copy())
 

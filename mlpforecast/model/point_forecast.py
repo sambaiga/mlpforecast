@@ -1,7 +1,9 @@
-import torch
-import pytorch_lightning as pl
 import logging
+
+import pytorch_lightning as pl
+import torch
 import torchmetrics
+
 from mlpforecast.net.layers import MLPForecastNetwork
 
 logging.basicConfig(level=logging.INFO)
@@ -9,7 +11,6 @@ logger = logging.getLogger("MLPF")
 
 
 class MLPForecastModel(pl.LightningModule):
-
     def __init__(
         self,
         data_pipeline,
@@ -54,7 +55,8 @@ class MLPForecastModel(pl.LightningModule):
             embed_type (String, optional): \
                 Type of embedding to use. Defaults to None. Either -> 'PosEmb', 'RotaryEmb', 'CombinedEmb'
             comb_type (String, optional): \
-                Type of combination to use. Defaults to 'attn-comb'. Either -> 'attn-comb', 'weighted-comb', 'addition-comb'
+                Type of combination to use. Defaults to 'attn-comb'. \
+                    Either -> 'attn-comb', 'weighted-comb', 'addition-comb'
             latent_size: (int, optional): \
                 Dimensionality of the latent space. Defaults to 64.
             depth (int, optional): Number of layers in the MLP. Defaults to 2.

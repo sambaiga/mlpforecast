@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from mlpforecast.net.embending import PosEmbedding, RotaryEmbedding
 
 ACTIVATIONS = [
@@ -184,7 +185,8 @@ class PastFutureEncoder(nn.Module):
 
         Parameters:
             emb_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
-            embed_type (String, optional): Type of embedding to use. Defaults to None. Either -> 'PosEmb', 'RotaryEmb', 'CombinedEmb'
+            embed_type (String, optional): \
+                Type of embedding to use. Defaults to None. Either -> 'PosEmb', 'RotaryEmb', 'CombinedEmb'
             latent_size: (int, optional): Dimensionality of the latent space. Defaults to 64.
             depth (int, optional): Number of layers in the MLP. Defaults to 2.
             input_size (int, optional): Size of the input window. Defaults to 96.
@@ -283,11 +285,15 @@ class MLPForecastNetwork(nn.Module):
 
         Parameters:
             target_series (List): List of target variables.
-            unknown_features (List, optional): List of unknown time-varying features. Defaults to [].
-            known_categorical_features (List, optional): List of known categorical time-varying features. Defaults to [].
-            known_continuous_features (List, optional): List of known time-varying features. Defaults to [].
+            unknown_features (List, optional): List of unknown time-varying features.\
+                  Defaults to [].
+            known_categorical_features (List, optional): List of known categorical time-varying features. \
+                  Defaults to [].
+            known_continuous_features (List, optional): List of known time-varying features. \
+                Defaults to [].
             embedding_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
-            embedding_type (String, optional): Type of embedding to use. Defaults to None. Either -> 'PosEmb', 'RotaryEmb', 'CombinedEmb'
+            embedding_type (String, optional): Type of embedding to use. \
+                Defaults to None. Either -> 'PosEmb', 'RotaryEmb', 'CombinedEmb'
             hidden_size: (int, optional): Dimensionality of the latent space. Defaults to 64.
             num_layers (int, optional): Number of layers in the MLP. Defaults to 2.
             forecast_horizon (int, optional): Number of future time steps to forecast. Defaults to 48.
@@ -296,7 +302,8 @@ class MLPForecastNetwork(nn.Module):
             num_attention_heads (int, optional): Number of heads in the multi-head attention. Defaults to 4.
             leaky_relu_alpha (float, optional): Alpha parameter for the loss. Defaults to 0.01.
             input_window_size (int, optional): Size of the input window. Defaults to 96.
-            combination_type (String, optional): Type of combination to use. Defaults to 'attn-comb'. Either -> 'attn-comb', 'weighted-comb', 'addition-comb'
+            combination_type (String, optional): Type of combination to use. \
+                Defaults to 'attn-comb'. Either -> 'attn-comb', 'weighted-comb', 'addition-comb'
         """
         super().__init__()
 
