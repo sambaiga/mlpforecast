@@ -1,21 +1,17 @@
 import logging
+
 import joblib
-import torchmetrics
 import pytorch_lightning as pl
-import torch
+import torchmetrics
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")
 
 
 class BaseForecastModel(pl.LightningModule):
-    def __init__(
-        self,
-        data_pipeline=None, 
-        metric='mae'
-    ):
-        
+    def __init__(self, data_pipeline=None, metric="mae"):
         super().__init__()
-        
+
         self.model = None
         self.data_pipeline = data_pipeline
         # get model size
@@ -46,14 +42,14 @@ class BaseForecastModel(pl.LightningModule):
         else:
             raise ValueError("Invalid metric. Please select 'mae', 'smape', 'mse'.")
         self.save_hyperparameters()
-        self.checkpoint_path='./'
-    
+        self.checkpoint_path = "./"
+
     def on_save_checkpoint(self, checkpoint):
         # Save the pipeline to a file
-        data_pipeline_path=f'{self.checkpoint_path}/data_pipeline.pkl'
+        data_pipeline_path = f"{self.checkpoint_path}/data_pipeline.pkl"
         joblib.dump(self.data_pipeline, data_pipeline_path)
         # Add the pipeline file path to the checkpoint dictionary
-        checkpoint['data_pipeline_path'] =data_pipeline_path
+        checkpoint["data_pipeline_path"] = data_pipeline_path
 
     def on_load_checkpoint(self, checkpoint):
-        self.data_pipeline = joblib.load(checkpoint['data_pipeline_path'])
+        self.data_pipeline = joblib.load(checkpoint["data_pipeline_path"])

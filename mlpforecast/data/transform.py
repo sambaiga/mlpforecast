@@ -99,13 +99,13 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         self.period = period
         self.exog_periods = None
         self.n_samples = get_n_sample_per_day(self.period)
-        self.max_data_drop=0
+        self.max_data_drop = 0
 
         steps = []
 
         if (self.lags is not None) and (len(self.lags) > 0):
             lags_scaled = [int(lag * self.n_samples) for lag in sorted(self.lags)]
-            self.max_data_drop=max(self.max_data_drop, max(lags_scaled))
+            self.max_data_drop = max(self.max_data_drop, max(lags_scaled))
             transformer_lags = FunctionTransformer(
                 tk.augment_lags,
                 kw_args={
@@ -120,7 +120,7 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             window_scaled = [
                 int(wsize * self.n_samples) for wsize in sorted(self.window)
             ]
-            self.max_data_drop=max(self.max_data_drop, max(window_scaled))
+            self.max_data_drop = max(self.max_data_drop, max(window_scaled))
             transformer_rolling = FunctionTransformer(
                 tk.augment_rolling,
                 kw_args={
@@ -178,10 +178,12 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
                 self.exog_periods = [
                     len(np.unique(exog[:, size])) for size in range(exog.shape[-1])
                 ]
-            seasonalities = np.hstack([
-                fourier_series_t(exog[:, i], self.exog_periods[i], 1)
-                for i in range(len(self.exog_periods))
-            ])
+            seasonalities = np.hstack(
+                [
+                    fourier_series_t(exog[:, i], self.exog_periods[i], 1)
+                    for i in range(len(self.exog_periods))
+                ]
+            )
             for i, col in enumerate(self.calender_variable):
                 data_transfomed[f"{col}-sin"] = seasonalities[:, i]
                 data_transfomed[f"{col}-cosin"] = (
@@ -240,6 +242,3 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         features = combine_past_future_exogenous(features, future_exogenous)
 
         return features, targets
-    
-
-

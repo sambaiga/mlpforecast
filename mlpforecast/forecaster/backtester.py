@@ -1,13 +1,15 @@
-from collections import namedtuple
-from copy import deepcopy
-import pandas as pd
-import numpy as np
-from functools import partial
 import logging
+from copy import deepcopy
+from functools import partial
+
+import numpy as np
+import pandas as pd
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Forecaster")
 
-class TimeSeriesSplitter(object):
+
+class TimeSeriesSplitter:
     """Cross validation splitter for time series data"""
 
     def __init__(
@@ -58,9 +60,7 @@ class TimeSeriesSplitter(object):
         if date_col is not None:
             self.date_col = date_col
             # support cases for multiple observations
-            self.dt_array = pd.to_datetime(
-                np.sort(self.df[self.date_col].unique())
-            )
+            self.dt_array = pd.to_datetime(np.sort(self.df[self.date_col].unique()))
 
         self._set_defaults()
 
@@ -122,10 +122,14 @@ class TimeSeriesSplitter(object):
         for i, train_end_idx in enumerate(test_seq):
             split_scheme[i] = {}
             train_start_idx = (
-                train_end_idx - self.min_train_len + 1 if self.window_type == "rolling" else 0
+                train_end_idx - self.min_train_len + 1
+                if self.window_type == "rolling"
+                else 0
             )
             split_scheme[i]["train_idx"] = range(train_start_idx, train_end_idx + 1)
-            split_scheme[i]["test_idx"] = range(train_end_idx + 1, train_end_idx + self.forecast_len + 1)
+            split_scheme[i]["test_idx"] = range(
+                train_end_idx + 1, train_end_idx + self.forecast_len + 1
+            )
 
             if self.date_col is not None:
                 split_scheme[i]["train_period"] = (
@@ -165,58 +169,84 @@ class TimeSeriesSplitter(object):
         else:
             for split_key, scheme in self._split_scheme.items():
                 train_df = self.df.loc[
-                    (self.df[self.date_col] >= scheme["train_period"][0]) &
-                    (self.df[self.date_col] <= scheme["train_period"][1]),
-                    :
+                    (self.df[self.date_col] >= scheme["train_period"][0])
+                    & (self.df[self.date_col] <= scheme["train_period"][1]),
+                    :,
                 ].reset_index(drop=True)
                 test_df = self.df.loc[
-                    (self.df[self.date_col] >= scheme["test_period"][0]) &
-                    (self.df[self.date_col] <= scheme["test_period"][1]),
-                    :
+                    (self.df[self.date_col] >= scheme["test_period"][0])
+                    & (self.df[self.date_col] <= scheme["test_period"][1]),
+                    :,
                 ].reset_index(drop=True)
                 yield train_df, test_df, scheme, split_key
 
 
-class BacktestingForecast(object):
-    def __init__(self,  n_splits=10, forecast_len = 3, 
-                        incremental_len = 1, min_train_len=6,
-                        window_type='expanding',
-                        n_sample_per_day:int=48,
-                        date_column="timestamp",
-                        ):
-        min_train_len = int(n_sample_per_day*30*min_train_len) # minimal length of window length
-        forecast_len = int(n_sample_per_day*30*forecast_len) # length forecast window
-        incremental_len = int(n_sample_per_day*30*incremental_len) # step length for moving forward)
-        self.date_column=date_column
-        self.generator = partial(TimeSeriesSplitter,
-                                                    min_train_len=min_train_len,
-                                                    incremental_len=incremental_len,
-                                                    forecast_len=forecast_len,
-                                                    window_type=window_type,
-                                                    n_splits=n_splits,
-                                                    date_col=date_column)
-    def fit(self, data, model, train_ratio=0.80, drop_last=False, num_worker=1, batch_size=64,
-                      pin_memory=True):
-        
+class BacktestingForecast:
+    def __init__(
+        self,
+        n_splits=10,
+        forecast_len=3,
+        incremental_len=1,
+        min_train_len=6,
+        window_type="expanding",
+        n_sample_per_day: int = 48,
+        date_column="timestamp",
+    ):
+        min_train_len = int(
+            n_sample_per_day * 30 * min_train_len
+        )  # minimal length of window length
+        forecast_len = int(
+            n_sample_per_day * 30 * forecast_len
+        )  # length forecast window
+        incremental_len = int(
+            n_sample_per_day * 30 * incremental_len
+        )  # step length for moving forward)
+        self.date_column = date_column
+        self.generator = partial(
+            TimeSeriesSplitter,
+            min_train_len=min_train_len,
+            incremental_len=incremental_len,
+            forecast_len=forecast_len,
+            window_type=window_type,
+            n_splits=n_splits,
+            date_col=date_column,
+        )
 
-        metrics_list=[]
-        metrics_spilit={}
+    def fit(
+        self,
+        data,
+        model,
+        train_ratio=0.80,
+        drop_last=False,
+        num_worker=1,
+        batch_size=64,
+        pin_memory=True,
+    ):
         self.generator(df=data)
 
         for train_df, test_df, scheme, key in self.generator.split():
+            f"{key}_cross_validation"
 
-            file_name=f'{key}_cross_validation'
-        
-            logger.info(f"---------------Fit  Backtesting expanding-{key+1} Cross validation Training --------------------------")
-           
-            logger.info(f"Train_window: from {train_df[self.date_column].iloc[0]} to  {train_df[self.date_column].iloc[-1]} ")
-      
-            logger.info(f"Test_window: from {test_df[self.date_column].iloc[0]} to  {test_df[self.date_column].iloc[-1]}")
-            
-            model.filename=f'{key}_cross_validation'
+            logger.info(
+                f"---------------Fit  Backtesting expanding-{key + 1} Cross validation Training --------------------------"
+            )
+
+            logger.info(
+                f"Train_window: from {train_df[self.date_column].iloc[0]} to  {train_df[self.date_column].iloc[-1]} "
+            )
+
+            logger.info(
+                f"Test_window: from {test_df[self.date_column].iloc[0]} to  {test_df[self.date_column].iloc[-1]}"
+            )
+
+            model.filename = f"{key}_cross_validation"
             model._create_folder()
             model_copy = deepcopy(model)
-            model_copy.fit(train_df, train_ratio=train_ratio, 
-                      drop_last=drop_last, num_worker=num_worker, 
-                      batch_size=batch_size,
-                      pin_memory=pin_memory)
+            model_copy.fit(
+                train_df,
+                train_ratio=train_ratio,
+                drop_last=drop_last,
+                num_worker=num_worker,
+                batch_size=batch_size,
+                pin_memory=pin_memory,
+            )

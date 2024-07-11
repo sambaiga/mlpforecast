@@ -1,10 +1,10 @@
 import logging
 
-import pytorch_lightning as pl
 import torch
-import torchmetrics
+
 from mlpforecast.model.base_model import BaseForecastModel
 from mlpforecast.net.layers import MLPForecastNetwork
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")
 
@@ -110,13 +110,11 @@ class MLPForecastModel(BaseForecastModel):
         # Assertion to ensure target_series is not empty
         assert len(target_series) > 0, "target_series should not be empty."
 
-        
         self.n_out = len(target_series)
         n_unknown = len(unknown_features) + self.n_out
         n_covariates = len(known_calender_features) + len(known_continuous_features)
         self.n_channels = n_unknown + n_covariates
-        
-        
+
         self.model = MLPForecastNetwork(
             n_target_series=len(target_series),
             n_unknown_features=len(unknown_features),
@@ -135,8 +133,6 @@ class MLPForecastModel(BaseForecastModel):
             alpha=alpha,
             num_attention_heads=num_attention_heads,
         )
-
-        
 
     def forecast(self, x):
         return self.model.forecast(x)

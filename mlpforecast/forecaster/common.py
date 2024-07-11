@@ -1,9 +1,13 @@
 from __future__ import annotations
+
 import logging
-import torch
 from pathlib import Path
 from timeit import default_timer
-from mlpforecast.forecaster.utils import get_latest_checkpoint, format_target
+
+import torch
+
+from mlpforecast.forecaster.utils import format_target, get_latest_checkpoint
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Forecaster")
 import pytorch_lightning as pl
@@ -193,7 +197,7 @@ class PytorchForecast:
     ):
         if self.model is None:
             raise ValueError("Model instance is empty")
-        self.model.checkpoint_path=self.checkpoints
+        self.model.checkpoint_path = self.checkpoints
         self.model.data_pipeline.fit(train_df.copy())
 
         if val_df is None and train_ratio > 0.0:
@@ -244,27 +248,28 @@ class PytorchForecast:
             logging.info(f"""training complete after {train_walltime / 60} minutes""")
 
             return train_walltime
-        
+
     def predict(self, test_df):
         self.load_checkpoint()
-        
-        ground_truth = test_df.iloc[self.model.data_pipeline.max_data_drop:]
-        time_stamp=ground_truth[[self.model.data_pipeline.date_column]].values
-        time_stamp=format_target(time_stamp, 
-                                 self.model.hparams['input_window_size'],
-                                 self.model.hparams['forecast_horizon'])
-        ground_truth=ground_truth[self.model.data_pipeline.target_series].values
-        ground_truth=format_target(ground_truth, 
-                                 self.model.hparams['input_window_size'],
-                                 self.model.hparams['forecast_horizon'])
-        
+
+        ground_truth = test_df.iloc[self.model.data_pipeline.max_data_drop :]
+        time_stamp = ground_truth[[self.model.data_pipeline.date_column]].values
+        time_stamp = format_target(
+            time_stamp,
+            self.model.hparams["input_window_size"],
+            self.model.hparams["forecast_horizon"],
+        )
+        ground_truth = ground_truth[self.model.data_pipeline.target_series].values
+        ground_truth = format_target(
+            ground_truth,
+            self.model.hparams["input_window_size"],
+            self.model.hparams["forecast_horizon"],
+        )
+
         start_time = default_timer()
         feature, _ = self.model.data_pipeline.transform(test_df.copy())
         feature = torch.FloatTensor(feature.copy())
         self.model.to(feature.device)
         pred = self.model.forecast(feature)
-        test_walltime = default_timer() - start_time
+        default_timer() - start_time
         return pred, time_stamp, ground_truth
-    
-  
-

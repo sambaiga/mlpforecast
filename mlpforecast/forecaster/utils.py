@@ -1,16 +1,19 @@
-import numpy as np
 import glob
 import os
 
+import numpy as np
+
+
 def format_target(targets, input_window_size, forecast_horizon):
     targets = np.squeeze(
-            np.lib.stride_tricks.sliding_window_view(
-                targets[input_window_size :],
-                (forecast_horizon, targets.shape[1]),
-            ),
-            axis=1,
-        )
+        np.lib.stride_tricks.sliding_window_view(
+            targets[input_window_size:],
+            (forecast_horizon, targets.shape[1]),
+        ),
+        axis=1,
+    )
     return targets.reshape(targets.shape[0], forecast_horizon, -1)
+
 
 def get_latest_checkpoint(checkpoint_path):
     checkpoint_path = str(checkpoint_path)
@@ -21,4 +24,3 @@ def get_latest_checkpoint(checkpoint_path):
     else:
         latest_file = None
     return latest_file
-

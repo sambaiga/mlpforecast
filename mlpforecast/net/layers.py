@@ -315,15 +315,12 @@ class MLPForecastNetwork(nn.Module):
             activation_function in ACTIVATIONS
         ), f"Invalid activation_function. Please select from: {ACTIVATIONS}"
 
-        assert (
-            embedding_type
-            in [
-                None,
-                "PosEmb",
-                "RotaryEmb",
-                "CombinedEmb",
-            ]
-        ), "Invalid embedding type, choose from -> None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'"
+        assert embedding_type in [
+            None,
+            "PosEmb",
+            "RotaryEmb",
+            "CombinedEmb",
+        ], "Invalid embedding type, choose from -> None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'"
         # Calculate the number of output targets, unknown features, and covariates
         self.n_out = n_target_series
         self.n_unknown = n_unknown_features + self.n_out
@@ -367,14 +364,11 @@ class MLPForecastNetwork(nn.Module):
         self.combination_type = combination_type
         self.alpha = alpha
 
-        assert (
-            combination_type
-            in [
-                "attn-comb",
-                "weighted-comb",
-                "additional",
-            ]
-        ), "Invalid embedding type, choose from -> 'attn-comb', 'weighted-comb', 'additional'"
+        assert combination_type in [
+            "attn-comb",
+            "weighted-comb",
+            "additional",
+        ], "Invalid embedding type, choose from -> 'attn-comb', 'weighted-comb', 'additional'"
 
         if combination_type == "attn-comb":
             self.attention = nn.MultiheadAttention(
