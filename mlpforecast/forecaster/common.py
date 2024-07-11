@@ -1,11 +1,9 @@
 from __future__ import annotations
-
-import glob
 import logging
-import os
+import torch
 from pathlib import Path
 from timeit import default_timer
-
+from mlpforecast.forecaster.utils import get_latest_checkpoint, format_target
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Forecaster")
 import pytorch_lightning as pl
@@ -21,17 +19,6 @@ from pytorch_lightning.callbacks import (
 from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
 
 from mlpforecast.data.loader import TimeseriesDataModule
-
-
-def get_latest_checkpoint(checkpoint_path):
-    checkpoint_path = str(checkpoint_path)
-    list_of_files = glob.glob(checkpoint_path + "/*.ckpt")
-
-    if list_of_files:
-        latest_file = max(list_of_files, key=os.path.getctime)
-    else:
-        latest_file = None
-    return latest_file
 
 
 class PytorchForecast:
@@ -206,7 +193,7 @@ class PytorchForecast:
     ):
         if self.model is None:
             raise ValueError("Model instance is empty")
-
+        self.model.checkpoint_path=self.checkpoints
         self.model.data_pipeline.fit(train_df.copy())
 
         if val_df is None and train_ratio > 0.0:
@@ -257,3 +244,27 @@ class PytorchForecast:
             logging.info(f"""training complete after {train_walltime / 60} minutes""")
 
             return train_walltime
+        
+    def predict(self, test_df):
+        self.load_checkpoint()
+        
+        ground_truth = test_df.iloc[self.model.data_pipeline.max_data_drop:]
+        time_stamp=ground_truth[[self.model.data_pipeline.date_column]].values
+        time_stamp=format_target(time_stamp, 
+                                 self.model.hparams['input_window_size'],
+                                 self.model.hparams['forecast_horizon'])
+        ground_truth=ground_truth[self.model.data_pipeline.target_series].values
+        ground_truth=format_target(ground_truth, 
+                                 self.model.hparams['input_window_size'],
+                                 self.model.hparams['forecast_horizon'])
+        
+        start_time = default_timer()
+        feature, _ = self.model.data_pipeline.transform(test_df.copy())
+        feature = torch.FloatTensor(feature.copy())
+        self.model.to(feature.device)
+        pred = self.model.forecast(feature)
+        test_walltime = default_timer() - start_time
+        return pred, time_stamp, ground_truth
+    
+  
+

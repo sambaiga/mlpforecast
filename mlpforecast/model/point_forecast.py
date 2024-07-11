@@ -3,18 +3,17 @@ import logging
 import pytorch_lightning as pl
 import torch
 import torchmetrics
-
+from mlpforecast.model.base_model import BaseForecastModel
 from mlpforecast.net.layers import MLPForecastNetwork
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")
 
 
-class MLPForecastModel(pl.LightningModule):
+class MLPForecastModel(BaseForecastModel):
     def __init__(
         self,
-        data_pipeline,
-        target_series,
+        data_pipeline=None,
+        target_series=None,
         unknown_features=[],
         known_calender_features=[],
         known_continuous_features=[],
@@ -101,7 +100,7 @@ class MLPForecastModel(pl.LightningModule):
             m = MLPForecastModel(**kwargs)
         """
 
-        super().__init__()
+        super().__init__(data_pipeline, metric)
         # Ensure target_series is a list
         if isinstance(target_series, str):
             target_series = [target_series]
@@ -110,11 +109,14 @@ class MLPForecastModel(pl.LightningModule):
 
         # Assertion to ensure target_series is not empty
         assert len(target_series) > 0, "target_series should not be empty."
+
+        
         self.n_out = len(target_series)
         n_unknown = len(unknown_features) + self.n_out
         n_covariates = len(known_calender_features) + len(known_continuous_features)
         self.n_channels = n_unknown + n_covariates
-        self.data_pipeline = data_pipeline
+        
+        
         self.model = MLPForecastNetwork(
             n_target_series=len(target_series),
             n_unknown_features=len(unknown_features),
@@ -134,32 +136,7 @@ class MLPForecastModel(pl.LightningModule):
             num_attention_heads=num_attention_heads,
         )
 
-        # get model size
-        param_size = 0
-        for param in self.model.parameters():
-            param_size += param.nelement() * param.element_size()
-        buffer_size = 0
-        for buffer in self.model.buffers():
-            buffer_size += buffer.nelement() * buffer.element_size()
-
-        self.size = (param_size + buffer_size) / 1024**2
-        logger.info(f"Model size: {self.size:.3f}MB")
-
-        # Initialize metric functions
-        if metric == "mae":
-            self.tra_metric_fcn = torchmetrics.MeanAbsoluteError()
-            self.val_metric_fcn = torchmetrics.MeanAbsoluteError()
-
-        elif metric == "mse":
-            self.tra_metric_fcn = torchmetrics.MeanSquaredError()
-            self.val_metric_fcn = torchmetrics.MeanSquaredError()
-
-        elif metric == "smape":
-            self.tra_metric_fcn = torchmetrics.SymmetricMeanAbsolutePercentageError()
-            self.val_metric_fcn = torchmetrics.SymmetricMeanAbsolutePercentageError()
-        else:
-            raise ValueError("Invalid metric. Please select 'mae', 'smape', 'mse'.")
-        self.save_hyperparameters()
+        
 
     def forecast(self, x):
         return self.model.forecast(x)

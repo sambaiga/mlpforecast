@@ -1,10 +1,11 @@
 from __future__ import annotations
-
+from timeit import default_timer
 import logging
-
+import torch
 from mlpforecast.forecaster.common import PytorchForecast
+from mlpforecast.forecaster.utils import get_latest_checkpoint, format_target
 from mlpforecast.model.point_forecast import MLPForecastModel
-
+import joblib
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")
 
@@ -72,3 +73,9 @@ class MLPForecast(PytorchForecast):
             }
 
         self.model = MLPForecastModel(**hparams)
+        
+    def load_checkpoint(self):
+        path_best_model = get_latest_checkpoint(self.checkpoints)
+        self.model = MLPForecastModel.load_from_checkpoint(path_best_model)
+        self.model.eval()
+        

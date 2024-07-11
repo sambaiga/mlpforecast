@@ -12,9 +12,9 @@ repos:
     rev: 1.8.1  # Latest version as of last known update
     hooks:
       - id: poetry-check
-      - id: poetry-lock
-      - id: poetry-export
-      - id: poetry-install
+     # - id: poetry-lock
+     # - id: poetry-export
+     # - id: poetry-install
 
 
   - repo: https://github.com/mxr/sync-pre-commit-deps
@@ -29,15 +29,6 @@ repos:
         args: ["--fix"]
       - id: ruff-format
       - id: ruff
-
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-      - id: black
-        language_version: python3.11
-      - id: black-jupyter
-        language_version: python3.11
-
 
 
   - repo: https://github.com/codespell-project/codespell
