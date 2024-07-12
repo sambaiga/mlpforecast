@@ -5,7 +5,7 @@ from pathlib import Path
 from timeit import default_timer
 
 import torch
-
+import pandas as pd
 from mlpforecast.forecaster.utils import format_target, get_latest_checkpoint
 
 logging.basicConfig(level=logging.INFO)
@@ -249,21 +249,25 @@ class PytorchForecast:
 
             return train_walltime
 
-    def predict(self, test_df):
+    def predict(self, test_df, daily_feature=True):
         self.load_checkpoint()
-
+        self.model.data_pipeline.daily_features = daily_feature
         ground_truth = test_df.iloc[self.model.data_pipeline.max_data_drop :]
+        ground_truth[self.model.data_pipeline.date_column] \
+            = pd.to_numeric(ground_truth[self.model.data_pipeline.date_column])
         time_stamp = ground_truth[[self.model.data_pipeline.date_column]].values
         time_stamp = format_target(
             time_stamp,
             self.model.hparams["input_window_size"],
             self.model.hparams["forecast_horizon"],
+            daily_feature=self.model.data_pipeline.daily_features,
         )
         ground_truth = ground_truth[self.model.data_pipeline.target_series].values
         ground_truth = format_target(
             ground_truth,
             self.model.hparams["input_window_size"],
             self.model.hparams["forecast_horizon"],
+            daily_feature=self.model.data_pipeline.daily_features,
         )
 
         start_time = default_timer()
@@ -272,4 +276,24 @@ class PytorchForecast:
         self.model.to(feature.device)
         pred = self.model.forecast(feature)
         default_timer() - start_time
-        return pred, time_stamp, ground_truth
+
+        scaler=self.model.data_pipeline.data_pipeline.named_steps['scaling']
+        scaler=scaler.named_transformers_['target_scaler']
+        N, T, C =pred['pred'].size()
+        pred['pred']=scaler.inverse_transform(pred['pred'].numpy().reshape(N*T, C))
+        pred['pred']=pred['pred'].reshape(N, T, C)
+        # Assert that the prediction and ground truth shapes are the same
+        assert pred['pred'].shape == ground_truth.shape, "Shape mismatch: pred['pred'] and ground_truth must have the same shape."
+
+
+        # Create a DataFrame with the timestamp index
+        results_df = pd.DataFrame(index=pd.to_datetime(time_stamp.flatten(), unit='ns'))
+
+        # Set the index name to the date column used in the pipeline
+        results_df.index.name = self.model.data_pipeline.date_column
+
+        # Iterate through the target series and populate the DataFrame
+        for target_idx, target_name in enumerate(self.model.data_pipeline.target_series):
+            results_df[target_name] = ground_truth[:, :, target_idx].flatten()
+            results_df[f"{target_name}_forecast"] = pred['pred'][:, :, target_idx].flatten()
+        return results_df

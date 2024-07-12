@@ -1,18 +1,16 @@
 import glob
 import os
 
-import numpy as np
+from mlpforecast.data.utils import extract_daily_sequences, extract_target_sequences
 
 
-def format_target(targets, input_window_size, forecast_horizon):
-    targets = np.squeeze(
-        np.lib.stride_tricks.sliding_window_view(
-            targets[input_window_size:],
-            (forecast_horizon, targets.shape[1]),
-        ),
-        axis=1,
-    )
-    return targets.reshape(targets.shape[0], forecast_horizon, -1)
+def format_target(targets, input_window_size, forecast_horizon, daily_feature=True):
+    if daily_feature:
+        return extract_daily_sequences(
+            targets, input_window_size, forecast_horizon, target_mode=True
+        )
+    else:
+        return extract_target_sequences(targets, input_window_size, forecast_horizon)
 
 
 def get_latest_checkpoint(checkpoint_path):
