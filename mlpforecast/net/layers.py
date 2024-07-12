@@ -462,10 +462,10 @@ class MLPForecastNetwork(nn.Module):
         y_pred = self(x)
 
         # Calculate the loss
-        loss = self.alpha * F.mse_loss(y_pred, y, reduction="none") + (
+        loss = self.alpha * F.mse_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean() + (
             1 - self.alpha
-        ) * F.l1_loss(y_pred, y, reduction="none")
-        loss = loss.sum(1).mean()
+        ) * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
+       
 
         # Compute the specified metric
         metric = metric_fn(y_pred, y)

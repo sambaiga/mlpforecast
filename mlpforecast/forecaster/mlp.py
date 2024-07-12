@@ -4,7 +4,7 @@ import logging
 
 from mlpforecast.forecaster.common import PytorchForecast
 from mlpforecast.forecaster.utils import get_latest_checkpoint
-from mlpforecast.model.point_forecast import MLPForecastModel
+from mlpforecast.model.deterministic import MLPForecastModel
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")

@@ -4,9 +4,11 @@ import logging
 from pathlib import Path
 from timeit import default_timer
 
-import torch
 import pandas as pd
+import torch
+
 from mlpforecast.forecaster.utils import format_target, get_latest_checkpoint
+from mlpforecast.metrics.deterministic import evaluate_point_forecast
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Forecaster")
@@ -116,7 +118,7 @@ class PytorchForecast:
         callback = []
         pl.seed_everything(self.seed, workers=True)
         if self.trial is not None:
-            self.logger = True  # DictLogger(self.logs,  version=self.trial.number)
+            self.logger = True 
             early_stopping = PyTorchLightningPruningCallback(
                 self.trial, monitor=self.metric
             )
@@ -244,25 +246,78 @@ class PytorchForecast:
                 self.datamodule.val_dataloader(),
                 ckpt_path=get_latest_checkpoint(self.checkpoints),
             )
-            train_walltime = default_timer() - start_time
-            logging.info(f"""training complete after {train_walltime / 60} minutes""")
+            self.train_walltime = default_timer() - start_time
+            logging.info(f"""training complete after {self.train_walltime / 60} minutes""")
 
-            return train_walltime
+           
 
-    def predict(self, test_df, daily_feature=True):
+    def load_and_prepare_data(self, test_df, daily_feature):
+        """Loads the checkpoint and prepares the ground truth data."""
         self.load_checkpoint()
         self.model.data_pipeline.daily_features = daily_feature
-        ground_truth = test_df.iloc[self.model.data_pipeline.max_data_drop :]
-        ground_truth[self.model.data_pipeline.date_column] \
-            = pd.to_numeric(ground_truth[self.model.data_pipeline.date_column])
+
+        # Prepare ground truth data
+        ground_truth = test_df.iloc[self.model.data_pipeline.max_data_drop :].copy()
+        ground_truth[self.model.data_pipeline.date_column] = pd.to_numeric(
+            ground_truth[self.model.data_pipeline.date_column]
+        )
+        return ground_truth
+
+    def perform_prediction(self, test_df):
+        """Performs the model prediction."""
+        features, _ = self.model.data_pipeline.transform(test_df.copy())
+        features = torch.FloatTensor(features.copy())
+        self.model.to(features.device)
+        self.model.eval()
+        return self.model.forecast(features)
+
+    def create_results_df(
+        self, time_stamp, ground_truth, predictions, target_series, date_column
+    ):
+        """Creates a DataFrame with the timestamp index and populates it with ground truth and forecasted values."""
+        results_df = pd.DataFrame(index=pd.to_datetime(time_stamp.flatten(), unit="ns"))
+        results_df.index.name = date_column
+
+        for target_idx, target_name in enumerate(target_series):
+            results_df[target_name] = ground_truth[:, :, target_idx].flatten()
+            results_df[f"{target_name}_forecast"] = predictions[
+                :, :, target_idx
+            ].flatten()
+
+        return results_df
+
+    def evaluate_point_forecast(self, ground_truth, pred, time_stamp):
+        """Evaluates the point forecast."""
+        return evaluate_point_forecast(
+            {
+                "true": ground_truth,
+                "loc": pred,
+                "index": time_stamp,
+                "targets": self.model.data_pipeline.target_series,
+            }
+        )
+
+    def predict(self, test_df, daily_feature=True):
+        """
+        Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
+
+        Args:
+            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
+            daily_feature (bool): Flag indicating whether daily features are used in the model. Default is True.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
+        """
+        ground_truth = self.load_and_prepare_data(test_df, daily_feature)
         time_stamp = ground_truth[[self.model.data_pipeline.date_column]].values
+        ground_truth = ground_truth[self.model.data_pipeline.target_series].values
+
         time_stamp = format_target(
             time_stamp,
             self.model.hparams["input_window_size"],
             self.model.hparams["forecast_horizon"],
             daily_feature=self.model.data_pipeline.daily_features,
         )
-        ground_truth = ground_truth[self.model.data_pipeline.target_series].values
         ground_truth = format_target(
             ground_truth,
             self.model.hparams["input_window_size"],
@@ -271,29 +326,42 @@ class PytorchForecast:
         )
 
         start_time = default_timer()
-        feature, _ = self.model.data_pipeline.transform(test_df.copy())
-        feature = torch.FloatTensor(feature.copy())
-        self.model.to(feature.device)
-        pred = self.model.forecast(feature)
-        default_timer() - start_time
+        pred = self.perform_prediction(test_df)
+        self.test_walltime=default_timer() - start_time
 
-        scaler=self.model.data_pipeline.data_pipeline.named_steps['scaling']
-        scaler=scaler.named_transformers_['target_scaler']
-        N, T, C =pred['pred'].size()
-        pred['pred']=scaler.inverse_transform(pred['pred'].numpy().reshape(N*T, C))
-        pred['pred']=pred['pred'].reshape(N, T, C)
+        # Inverse transform predictions
+        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
+        target_scaler = scaler.named_transformers_["target_scaler"]
+
+        N, T, C = pred["pred"].size()
+        pred["pred"] = target_scaler.inverse_transform(
+            pred["pred"].numpy().reshape(N * T, C)
+        )
+        pred["pred"] = pred["pred"].reshape(N, T, C)
+
+        # Evaluate point forecast
+        self.metrics = self.evaluate_point_forecast(
+            ground_truth, pred["pred"], time_stamp
+        )
+        self.metrics['test-time']=self.test_walltime
+        self.metrics['train-time']=self.train_walltime
+        self.metrics['Model']=self.model_type.upper()
+
         # Assert that the prediction and ground truth shapes are the same
-        assert pred['pred'].shape == ground_truth.shape, "Shape mismatch: pred['pred'] and ground_truth must have the same shape."
+        assert (
+            pred["pred"].shape == ground_truth.shape
+        ), "Shape mismatch: pred['pred'] and ground_truth must have the same shape."
 
-
-        # Create a DataFrame with the timestamp index
-        results_df = pd.DataFrame(index=pd.to_datetime(time_stamp.flatten(), unit='ns'))
-
-        # Set the index name to the date column used in the pipeline
-        results_df.index.name = self.model.data_pipeline.date_column
-
-        # Iterate through the target series and populate the DataFrame
-        for target_idx, target_name in enumerate(self.model.data_pipeline.target_series):
-            results_df[target_name] = ground_truth[:, :, target_idx].flatten()
-            results_df[f"{target_name}_forecast"] = pred['pred'][:, :, target_idx].flatten()
+        # Create results DataFrame
+        results_df = self.create_results_df(
+            time_stamp,
+            ground_truth,
+            pred["pred"],
+            self.model.data_pipeline.target_series,
+            self.model.data_pipeline.date_column,
+        )
+        results_df['Model']=self.model_type.upper()
+           
         return results_df
+
+    
