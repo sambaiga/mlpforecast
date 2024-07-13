@@ -14,7 +14,7 @@
 - [mlpForecaster(MLPF)](#mlpforecastermlpf)
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
-  - [Installation](#installation-1)
+  - [Usage](#usage)
   - [Features](#features)
   - [Examples](#examples)
   - [Contributing](#contributing)
@@ -30,7 +30,7 @@ You can install the `mlpForecaster` via pip:
 pip install mlpforecaster
 ```
 
-## Installation
+## Usage
 
 ```python
 from mlpforecast.forecaster.mlp import MLPForecast
