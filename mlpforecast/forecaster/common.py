@@ -251,6 +251,7 @@ class PytorchForecast:
                 f"""training complete after {self.train_walltime / 60} minutes"""
             )
             return self.train_walltime
+
     def load_and_prepare_data(self, test_df, daily_feature):
         """Loads the checkpoint and prepares the ground truth data."""
         self.load_checkpoint()

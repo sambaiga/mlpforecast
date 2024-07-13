@@ -67,4 +67,3 @@ class MLPForecast(PytorchForecast):
         path_best_model = get_latest_checkpoint(self.checkpoints)
         self.model = MLPForecastModel.load_from_checkpoint(path_best_model)
         self.model.eval()
-

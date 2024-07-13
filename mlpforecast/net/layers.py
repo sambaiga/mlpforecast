@@ -165,9 +165,11 @@ class MLPBlock(nn.Module):
         x = self.mlp_network[-1](x)
         return x
 
-import torch
+
 import torch.nn as nn
+
 from mlpforecast.net.layers import MLPBlock, PosEmbedding, RotaryEmbedding
+
 
 class PastFutureEncoder(nn.Module):
     def __init__(
@@ -222,11 +224,15 @@ class PastFutureEncoder(nn.Module):
 
         # Embedding based on the specified type
         if embedding_type == "PosEmb":
-            self.embedding = PosEmbedding(n_channels, embedding_size, window_size=context_size)
+            self.embedding = PosEmbedding(
+                n_channels, embedding_size, window_size=context_size
+            )
         elif embedding_type == "RotaryEmb":
             self.embedding = RotaryEmbedding(embedding_size)
         elif embedding_type == "CombinedEmb":
-            self.pos_embedding = PosEmbedding(n_channels, embedding_size, window_size=context_size)
+            self.pos_embedding = PosEmbedding(
+                n_channels, embedding_size, window_size=context_size
+            )
             self.rotary_embedding = RotaryEmbedding(embedding_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -256,8 +262,6 @@ class PastFutureEncoder(nn.Module):
         x = self.encoder(x)
 
         return x
-
-
 
 
 class MLPForecastNetwork(nn.Module):
@@ -308,9 +312,18 @@ class MLPForecastNetwork(nn.Module):
         super().__init__()
 
         # Ensure valid activation and embedding types
-        assert activation_function in ACTIVATIONS, f"Invalid activation_function. Please select from: {ACTIVATIONS}"
-        assert out_activation_function in ACTIVATIONS, f"Invalid out_activation_function. Please select from: {ACTIVATIONS}"
-        assert embedding_type in [None, "PosEmb", "RotaryEmb", "CombinedEmb"], "Invalid embedding type, choose from: None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'"
+        assert (
+            activation_function in ACTIVATIONS
+        ), f"Invalid activation_function. Please select from: {ACTIVATIONS}"
+        assert (
+            out_activation_function in ACTIVATIONS
+        ), f"Invalid out_activation_function. Please select from: {ACTIVATIONS}"
+        assert embedding_type in [
+            None,
+            "PosEmb",
+            "RotaryEmb",
+            "CombinedEmb",
+        ], "Invalid embedding type, choose from: None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'"
 
         self.n_out = n_target_series
         self.n_unknown = n_unknown_features + self.n_out
@@ -351,10 +364,16 @@ class MLPForecastNetwork(nn.Module):
         self.combination_type = combination_type
         self.alpha = alpha
 
-        assert combination_type in ["attn-comb", "weighted-comb", "addition-comb"], "Invalid combination type, choose from: 'attn-comb', 'weighted-comb', 'addition-comb'"
+        assert combination_type in [
+            "attn-comb",
+            "weighted-comb",
+            "addition-comb",
+        ], "Invalid combination type, choose from: 'attn-comb', 'weighted-comb', 'addition-comb'"
 
         if combination_type == "attn-comb":
-            self.attention = nn.MultiheadAttention(hidden_size, num_attention_heads, dropout=dropout_rate)
+            self.attention = nn.MultiheadAttention(
+                hidden_size, num_attention_heads, dropout=dropout_rate
+            )
 
         if combination_type == "weighted-comb":
             self.gate = nn.Linear(2 * hidden_size, hidden_size)
@@ -396,12 +415,14 @@ class MLPForecastNetwork(nn.Module):
         Returns:
             torch.Tensor: Output tensor after processing through the network.
         """
-        f = self.encoder(x[:, :self.input_window_size, :])
+        f = self.encoder(x[:, : self.input_window_size, :])
 
         if self.n_covariates > 0:
-            h = self.horizon(x[:, self.input_window_size:, self.n_unknown:])
+            h = self.horizon(x[:, self.input_window_size :, self.n_unknown :])
             if self.combination_type == "attn-comb":
-                ph_hf = self.attention(h.unsqueeze(0), f.unsqueeze(0), f.unsqueeze(0))[0].squeeze(0)
+                ph_hf = self.attention(h.unsqueeze(0), f.unsqueeze(0), f.unsqueeze(0))[
+                    0
+                ].squeeze(0)
             elif self.combination_type == "weighted-comb":
                 gate = self.gate(torch.cat((h, f), -1)).sigmoid()
                 ph_hf = (1 - gate) * f + gate * h
@@ -411,7 +432,9 @@ class MLPForecastNetwork(nn.Module):
             ph_hf = f
 
         z = self.decoder(ph_hf)
-        loc = self.out_activation(self.mu(z).reshape(z.size(0), self.forecast_horizon, self.n_out))
+        loc = self.out_activation(
+            self.mu(z).reshape(z.size(0), self.forecast_horizon, self.n_out)
+        )
 
         return loc
 
@@ -432,10 +455,10 @@ class MLPForecastNetwork(nn.Module):
 
         loss = (
             self.alpha * F.mse_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
-            + (1 - self.alpha) * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
+            + (1 - self.alpha)
+            * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
         )
 
         metric = metric_fn(y_pred, y)
 
         return loss, metric
-

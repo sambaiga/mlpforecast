@@ -81,4 +81,3 @@ This work is inspired by the research from the following publication:
 A. Faustine, N. J. Nunes and L. Pereira, "Efficiency through Simplicity: MLP-based Approach for Net-Load Forecasting with Uncertainty Estimates in Low-Voltage Distribution Networks," in IEEE Transactions on Power Systems, doi: [10.1109/TPWRS.2024.3400123](https://ieeexplore-ieee-org.tudublin.idm.oclc.org/document/10529636).
 
 <!-- markdownlint-restore -->
-

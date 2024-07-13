@@ -222,7 +222,7 @@ class BacktestingForecast:
         batch_size=64,
         pin_memory=True,
     ):
-        self.generator=self.generator(df=data)
+        self.generator = self.generator(df=data)
         backtest_metrics, backtest_df = pd.DataFrame(), pd.DataFrame()
         for train_df, test_df, scheme, key in self.generator.split():
             f"{key}_cross_validation"
