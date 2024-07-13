@@ -250,7 +250,7 @@ class PytorchForecast:
             logging.info(
                 f"""training complete after {self.train_walltime / 60} minutes"""
             )
-
+            return self.train_walltime
     def load_and_prepare_data(self, test_df, daily_feature):
         """Loads the checkpoint and prepares the ground truth data."""
         self.load_checkpoint()
@@ -344,7 +344,6 @@ class PytorchForecast:
             ground_truth, pred["pred"], time_stamp
         )
         self.metrics["test-time"] = self.test_walltime
-        self.metrics["train-time"] = self.train_walltime
         self.metrics["Model"] = self.model_type.upper()
 
         # Assert that the prediction and ground truth shapes are the same

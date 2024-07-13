@@ -241,7 +241,7 @@ class BacktestingForecast:
             )
 
             filename = f"{key + 1}_cross_validation"
-            model = model_instance(filename=filename)
+            model = model_instance(file_name=filename)
             model_copy = deepcopy(model)
             model_copy.fit(
                 train_df,
