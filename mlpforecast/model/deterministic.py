@@ -19,7 +19,7 @@ class MLPForecastModel(BaseForecastModel):
         forecast_horizon: int = 48,
         embedding_size: int = 28,
         embedding_type: str = None,
-        combination_type: str = "attn-comb",
+        combination_type: str = 'addition-comb',
         hidden_size: int = 64,
         num_layers: int = 2,
         expansion_factor: int = 2,
