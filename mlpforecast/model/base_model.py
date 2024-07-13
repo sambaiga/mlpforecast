@@ -1,7 +1,7 @@
 import logging
 
 import joblib
-import pytorch_lightning as pl
+import lightning as pl
 import torchmetrics
 
 logging.basicConfig(level=logging.INFO)

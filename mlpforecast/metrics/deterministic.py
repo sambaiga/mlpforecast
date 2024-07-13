@@ -89,13 +89,13 @@ def get_pointwise_metrics(pred: np.array, true: np.array, target_range: float = 
         "RMSE": rmse,
         "NRMSE": nrmse,
         "MAE": mae,
-        "MAPE": mape,
+        "MAPE(%)": mape*100,
         "CORR": corr,
         "MAX-error": max_res,
         "D2-error": d2_err,
         "NBIAS": nbias,
         "R2-error": r2,
-        "SMAPE": smape,
+        "SMAPE(%)": smape*100,
     }
 
 

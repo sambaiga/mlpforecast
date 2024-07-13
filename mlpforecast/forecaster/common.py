@@ -12,18 +12,17 @@ from mlpforecast.metrics.deterministic import evaluate_point_forecast
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Forecaster")
-import pytorch_lightning as pl
+import lightning as pl
 from optuna_integration.pytorch_lightning import PyTorchLightningPruningCallback
-from pytorch_lightning import loggers
-from pytorch_lightning.callbacks import (
+from lightning.pytorch import loggers
+from lightning.pytorch.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
     ModelCheckpoint,
     RichProgressBar,
     TQDMProgressBar,
 )
-from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
-
+from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
 from mlpforecast.data.loader import TimeseriesDataModule
 
 
@@ -117,8 +116,19 @@ class PytorchForecast:
     def _set_up_trainer(self):
         callback = []
         pl.seed_everything(self.seed, workers=True)
+        if not self.wandb:
+                self.logger = loggers.TensorBoardLogger(
+                    save_dir=self.logs,
+                    version=(self.file_name if self.file_name is not None else 0),
+                )
+        else:
+            self.logger = loggers.WandbLogger(
+                    save_dir=self.logs,
+                    name=self.file_name,
+                    project=self.exp_name,
+                    log_model="all",
+                )
         if self.trial is not None:
-            self.logger = True
             early_stopping = PyTorchLightningPruningCallback(
                 self.trial, monitor=self.metric
             )
@@ -133,32 +143,20 @@ class PytorchForecast:
                 check_on_train_epoch_end=True,
             )
             callback.append(early_stopping)
-            if not self.wandb:
-                self.logger = loggers.TensorBoardLogger(
-                    save_dir=self.logs,
-                    version=(self.file_name if self.file_name is not None else 0),
-                )
-            else:
-                self.logger = loggers.WandbLogger(
-                    save_dir=self.logs,
-                    name=self.file_name,
-                    project=self.exp_name,
-                    log_model="all",
-                )
-                # self.logger.watch(self.model)
-                # log gradients and model topology
+            
+            
 
-            self.checkpoints.mkdir(parents=True, exist_ok=True)
-            checkpoint_callback = ModelCheckpoint(
+        self.checkpoints.mkdir(parents=True, exist_ok=True)
+        checkpoint_callback = ModelCheckpoint(
                 dirpath=self.checkpoints,
                 monitor=self.metric,
                 mode="min",
                 save_top_k=1,
                 filename="{epoch:02d}",
             )
-            callback.append(checkpoint_callback)
-            lr_logger = LearningRateMonitor()
-            callback.append(lr_logger)
+        callback.append(checkpoint_callback)
+        lr_logger = LearningRateMonitor()
+        callback.append(lr_logger)
 
         if self.rich_progress_bar:
             progress_bar = RichProgressBar(
@@ -192,7 +190,7 @@ class PytorchForecast:
         train_df,
         val_df=None,
         train_ratio=0.80,
-        drop_last=False,
+        drop_last=True,
         num_worker=1,
         batch_size=64,
         pin_memory=True,
@@ -229,15 +227,23 @@ class PytorchForecast:
         start_time = default_timer()
         logger.info("""---------------Training started ---------------------------""")
         if self.trial is not None:
+
             self.trainer.fit(
                 self.model,
                 self.datamodule.train_dataloader(),
                 self.datamodule.val_dataloader(),
+                ckpt_path=get_latest_checkpoint(self.checkpoints),
             )
 
             self.train_walltime = default_timer() - start_time
             logging.info(f"training complete after {self.train_walltime / 60} minutes")
-            return self.trainer.callback_metrics[self.metric].item()
+            
+           
+            pred_df=self.predict(val_df)
+            self.metrics.groupby('target')['SMAPE'].mean()
+            cost=self.metrics.groupby('target')['MAE'].mean().iloc[-1].round(2)
+            return cost
+            #return self.trainer.callback_metrics[self.metric].item()
 
         else:
             self.trainer.fit(

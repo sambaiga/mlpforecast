@@ -42,7 +42,7 @@ out=model.predict(test_data)
 
 ```
 ## Features
-
+![alt text](images/prediction.png)
 - **Point Forecasting**: Generate single-point predictions for your data.
 - **Probabilistic Forecasting**: Provide probabilistic estimates for your predictions.
 - **Low Model Complexity**: Designed to minimize complexity while maintaining high performance.
