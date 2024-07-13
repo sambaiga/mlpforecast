@@ -165,44 +165,48 @@ class MLPBlock(nn.Module):
         x = self.mlp_network[-1](x)
         return x
 
+import torch
+import torch.nn as nn
+from mlpforecast.net.layers import MLPBlock, PosEmbedding, RotaryEmbedding
 
 class PastFutureEncoder(nn.Module):
     def __init__(
         self,
-        emb_size=28,
-        embed_type=None,
-        latent_size=64,
-        depth=2,
-        residual=False,
-        expansion_factor=2,
-        context_size=96,
-        activation=nn.ReLU(),
-        dropout=0.25,
-        n_channels=1,
+        embedding_size: int = 28,
+        embedding_type: str = None,
+        latent_size: int = 64,
+        num_layers: int = 2,
+        residual: bool = False,
+        expansion_factor: int = 2,
+        context_size: int = 96,
+        activation: nn.Module = nn.ReLU(),
+        dropout_rate: float = 0.25,
+        n_channels: int = 1,
     ):
         """
         Encoder module for processing past sequences.
 
-        Parameters:
-            emb_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
-            embed_type (String, optional): \
-                Type of embedding to use. Defaults to None. Either -> 'PosEmb', 'RotaryEmb', 'CombinedEmb'
-            latent_size: (int, optional): Dimensionality of the latent space. Defaults to 64.
-            depth (int, optional): Number of layers in the MLP. Defaults to 2.
-            input_size (int, optional): Size of the input window. Defaults to 96.
-            activation (torch.nn.Module, optional): Activation function. Defaults to ReLU().
-            dropout (float, optional): Dropout probability. Defaults to 0.25.
+        Args:
+            embedding_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
+            embedding_type (str, optional): Type of embedding to use. Defaults to None. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'.
+            latent_size (int, optional): Dimensionality of the latent space. Defaults to 64.
+            num_layers (int, optional): Number of layers in the MLP. Defaults to 2.
+            residual (bool, optional): Whether to use residual connections in the MLP. Defaults to False.
+            expansion_factor (int, optional): Expansion factor for the MLP. Defaults to 2.
+            context_size (int, optional): Size of the input context window. Defaults to 96.
+            activation (nn.Module, optional): Activation function. Defaults to nn.ReLU().
+            dropout_rate (float, optional): Dropout probability. Defaults to 0.25.
             n_channels (int, optional): Number of input channels. Defaults to 1.
         """
         super().__init__()
 
         self.encoder = MLPBlock(
-            in_size=emb_size if embed_type is not None else n_channels,
+            in_size=embedding_size if embedding_type is not None else n_channels,
             latent_dim=latent_size,
             features_start=latent_size,
             expansion_factor=expansion_factor,
             residual=residual,
-            num_layers=depth,
+            num_layers=num_layers,
             context_size=context_size,
             activation=activation,
         )
@@ -211,27 +215,25 @@ class PastFutureEncoder(nn.Module):
         self.norm = nn.LayerNorm(n_channels)
 
         # Apply dropout to the input
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(dropout_rate)
 
         # Store hyperparameters
-        self.embed_type = embed_type
+        self.embedding_type = embedding_type
 
         # Embedding based on the specified type
-        if embed_type == "PosEmb":
-            self.emb = PosEmbedding(n_channels, emb_size, window_size=context_size)
-        elif embed_type == "RotaryEmb":
-            self.emb = RotaryEmbedding(emb_size)
-        elif embed_type == "CombinedEmb":
-            self.pos_emb = self.emb = PosEmbedding(
-                n_channels, emb_size, window_size=context_size
-            )
-            self.rotary_emb = RotaryEmbedding(emb_size)
+        if embedding_type == "PosEmb":
+            self.embedding = PosEmbedding(n_channels, embedding_size, window_size=context_size)
+        elif embedding_type == "RotaryEmb":
+            self.embedding = RotaryEmbedding(embedding_size)
+        elif embedding_type == "CombinedEmb":
+            self.pos_embedding = PosEmbedding(n_channels, embedding_size, window_size=context_size)
+            self.rotary_embedding = RotaryEmbedding(embedding_size)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass of the PastEncoder module.
+        Forward pass of the PastFutureEncoder module.
 
-        Parameters:
+        Args:
             x (torch.Tensor): Input tensor.
 
         Returns:
@@ -241,14 +243,12 @@ class PastFutureEncoder(nn.Module):
         x = self.norm(x)
 
         # Apply embedding based on the specified type
-
-        if self.embed_type == "CombinedEmb":
-            x = self.pos_emb(x) + self.rotary_emb(x)
+        if self.embedding_type == "CombinedEmb":
+            x = self.pos_embedding(x) + self.rotary_embedding(x)
             # Apply dropout to the embedded input
             x = self.dropout(x)
-
-        elif self.embed_type in ["PosEmb", "RotaryEmb"]:
-            x = self.emb(x)
+        elif self.embedding_type in ["PosEmb", "RotaryEmb"]:
+            x = self.embedding(x)
             # Apply dropout to the embedded input
             x = self.dropout(x)
 
@@ -258,16 +258,18 @@ class PastFutureEncoder(nn.Module):
         return x
 
 
+
+
 class MLPForecastNetwork(nn.Module):
     def __init__(
         self,
         n_target_series: int,
         n_unknown_features: int,
-        n_known_calender_features: int,
+        n_known_calendar_features: int,
         n_known_continuous_features: int,
         embedding_size: int = 28,
         embedding_type: str = None,
-        combination_type: str = "additional",
+        combination_type: str = "attn-comb",
         expansion_factor: int = 2,
         residual: bool = False,
         hidden_size: int = 256,
@@ -277,108 +279,85 @@ class MLPForecastNetwork(nn.Module):
         activation_function: str = "SiLU",
         out_activation_function: str = "Identity",
         dropout_rate: float = 0.25,
-        alpha=0.1,
+        alpha: float = 0.1,
         num_attention_heads: int = 4,
     ):
         """
         Multilayer Perceptron (MLP) Forecast Network for time series forecasting.
 
-        Parameters:
-            target_series (List): List of target variables.
-            unknown_features (List, optional): List of unknown time-varying features.\
-                  Defaults to [].
-            known_categorical_features (List, optional): List of known categorical time-varying features. \
-                  Defaults to [].
-            known_continuous_features (List, optional): List of known time-varying features. \
-                Defaults to [].
+        Args:
+            n_target_series (int): Number of target series.
+            n_unknown_features (int): Number of unknown time-varying features.
+            n_known_calendar_features (int): Number of known categorical time-varying features.
+            n_known_continuous_features (int): Number of known continuous time-varying features.
             embedding_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
-            embedding_type (String, optional): Type of embedding to use. \
-                Defaults to None. Either -> 'PosEmb', 'RotaryEmb', 'CombinedEmb'
-            hidden_size: (int, optional): Dimensionality of the latent space. Defaults to 64.
+            embedding_type (str, optional): Type of embedding to use. Defaults to None. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'.
+            combination_type (str, optional): Type of combination to use. Defaults to 'attn-comb'. Options: 'attn-comb', 'weighted-comb', 'addition-comb'.
+            expansion_factor (int, optional): Expansion factor for the encoder. Defaults to 2.
+            residual (bool, optional): Whether to use residual connections in the encoder. Defaults to False.
+            hidden_size (int, optional): Dimensionality of the hidden layers. Defaults to 256.
             num_layers (int, optional): Number of layers in the MLP. Defaults to 2.
             forecast_horizon (int, optional): Number of future time steps to forecast. Defaults to 48.
-            activation_function (torch.nn.Module, optional): Activation function. Defaults to ReLU().
-            dropout_rate (float, optional): Dropout probability. Defaults to 0.25.
-            num_attention_heads (int, optional): Number of heads in the multi-head attention. Defaults to 4.
-            leaky_relu_alpha (float, optional): Alpha parameter for the loss. Defaults to 0.01.
             input_window_size (int, optional): Size of the input window. Defaults to 96.
-            combination_type (String, optional): Type of combination to use. \
-                Defaults to 'attn-comb'. Either -> 'attn-comb', 'weighted-comb', 'addition-comb'
+            activation_function (str, optional): Activation function. Defaults to 'SiLU'.
+            out_activation_function (str, optional): Output activation function. Defaults to 'Identity'.
+            dropout_rate (float, optional): Dropout probability. Defaults to 0.25.
+            alpha (float, optional): Alpha parameter for the loss. Defaults to 0.1.
+            num_attention_heads (int, optional): Number of heads in the multi-head attention. Defaults to 4.
         """
         super().__init__()
 
-        # Assertion to ensure activation_function is valid
-        assert (
-            activation_function in ACTIVATIONS
-        ), f"Invalid activation_function. Please select from: {ACTIVATIONS}"
-        assert (
-            activation_function in ACTIVATIONS
-        ), f"Invalid activation_function. Please select from: {ACTIVATIONS}"
+        # Ensure valid activation and embedding types
+        assert activation_function in ACTIVATIONS, f"Invalid activation_function. Please select from: {ACTIVATIONS}"
+        assert out_activation_function in ACTIVATIONS, f"Invalid out_activation_function. Please select from: {ACTIVATIONS}"
+        assert embedding_type in [None, "PosEmb", "RotaryEmb", "CombinedEmb"], "Invalid embedding type, choose from: None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'"
 
-        assert embedding_type in [
-            None,
-            "PosEmb",
-            "RotaryEmb",
-            "CombinedEmb",
-        ], "Invalid embedding type, choose from -> None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'"
-        # Calculate the number of output targets, unknown features, and covariates
         self.n_out = n_target_series
         self.n_unknown = n_unknown_features + self.n_out
-        self.n_covariates = n_known_calender_features + n_known_continuous_features
+        self.n_covariates = n_known_calendar_features + n_known_continuous_features
         self.n_channels = self.n_unknown + self.n_covariates
-
+        self.input_window_size = input_window_size
+        self.forecast_horizon = forecast_horizon
         self.out_activation = getattr(nn, out_activation_function)()
         self.activation = getattr(nn, activation_function)()
 
-        # Initialize PastEncoder for processing past sequences
         self.encoder = PastFutureEncoder(
-            emb_size=embedding_size,
-            embed_type=embedding_type,
+            embedding_size=embedding_size,
+            embedding_type=embedding_type,
             latent_size=hidden_size,
-            depth=num_layers,
+            num_layers=num_layers,
             residual=residual,
             expansion_factor=expansion_factor,
             context_size=input_window_size,
             activation=self.activation,
-            dropout=dropout_rate,
+            dropout_rate=dropout_rate,
             n_channels=self.n_channels,
         )
 
-        # Initialize FutureEncoder for processing future sequences
         if self.n_covariates > 0:
             self.horizon = PastFutureEncoder(
-                emb_size=embedding_size,
-                embed_type=embedding_type,
+                embedding_size=embedding_size,
+                embedding_type=embedding_type,
                 latent_size=hidden_size,
-                depth=num_layers,
+                num_layers=num_layers,
                 residual=residual,
                 expansion_factor=expansion_factor,
                 context_size=forecast_horizon,
                 activation=self.activation,
-                dropout=dropout_rate,
+                dropout_rate=dropout_rate,
                 n_channels=self.n_covariates,
             )
 
-        # Hyperparameters and components for decoding
-        self.window_size = input_window_size
         self.combination_type = combination_type
         self.alpha = alpha
 
-        assert combination_type in [
-            "attn-comb",
-            "weighted-comb",
-            "additional",
-        ], "Invalid embedding type, choose from -> 'attn-comb', 'weighted-comb', 'additional'"
+        assert combination_type in ["attn-comb", "weighted-comb", "addition-comb"], "Invalid combination type, choose from: 'attn-comb', 'weighted-comb', 'addition-comb'"
 
         if combination_type == "attn-comb":
-            self.attention = nn.MultiheadAttention(
-                hidden_size, num_attention_heads, dropout=dropout_rate
-            )
+            self.attention = nn.MultiheadAttention(hidden_size, num_attention_heads, dropout=dropout_rate)
 
         if combination_type == "weighted-comb":
             self.gate = nn.Linear(2 * hidden_size, hidden_size)
-
-        self.comb_type = combination_type
 
         self.decoder = nn.Sequential(
             FeedForward(
@@ -392,11 +371,11 @@ class MLPForecastNetwork(nn.Module):
 
         self.mu = nn.Linear(hidden_size, self.n_out * forecast_horizon)
 
-    def forecast(self, x):
+    def forecast(self, x: torch.Tensor) -> dict:
         """
         Generates forecasts for the input sequences.
 
-        Parameters:
+        Args:
             x (torch.Tensor): Input tensor.
 
         Returns:
@@ -407,49 +386,40 @@ class MLPForecastNetwork(nn.Module):
 
         return {"pred": pred}
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the MLPForecastNetwork.
 
-        Parameters:
+        Args:
             x (torch.Tensor): Input tensor.
 
         Returns:
             torch.Tensor: Output tensor after processing through the network.
         """
+        f = self.encoder(x[:, :self.input_window_size, :])
 
-        # Process past sequences with the encoder
-        f = self.encoder(x[:, : self.window_size, :])
-
-        # Process future sequences with the horizon encoder
         if self.n_covariates > 0:
-            h = self.horizon(x[:, self.window_size :, self.n_unknown :])
-            if self.comb_type == "attn-comb":
-                ph_hf = self.attention(h.unsqueeze(0), f.unsqueeze(0), f.unsqueeze(0))[
-                    0
-                ].squeeze(0)
-            elif self.comb_type == "weighted-comb":
-                # Compute the gate mechanism
+            h = self.horizon(x[:, self.input_window_size:, self.n_unknown:])
+            if self.combination_type == "attn-comb":
+                ph_hf = self.attention(h.unsqueeze(0), f.unsqueeze(0), f.unsqueeze(0))[0].squeeze(0)
+            elif self.combination_type == "weighted-comb":
                 gate = self.gate(torch.cat((h, f), -1)).sigmoid()
-                # Combine past and future information using the gate mechanism
                 ph_hf = (1 - gate) * f + gate * h
             else:
                 ph_hf = h + f
         else:
             ph_hf = f
 
-        # Decode the combined information
         z = self.decoder(ph_hf)
-        # Compute the final output
-        loc = self.out_activation(self.mu(z).reshape(z.size(0), -1, self.n_out))
+        loc = self.out_activation(self.mu(z).reshape(z.size(0), self.forecast_horizon, self.n_out))
 
         return loc
 
-    def step(self, batch, metric_fn):
+    def step(self, batch: tuple, metric_fn: callable) -> tuple:
         """
         Training step for the MLPForecastNetwork.
 
-        Parameters:
+        Args:
             batch (tuple): Tuple containing input and target tensors.
             metric_fn (callable): Metric function to evaluate.
 
@@ -458,16 +428,14 @@ class MLPForecastNetwork(nn.Module):
         """
         x, y = batch
 
-        # Forward pass to obtain predictions
         y_pred = self(x)
 
-        # Calculate the loss
-        loss = self.alpha * F.mse_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean() + (
-            1 - self.alpha
-        ) * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
-       
+        loss = (
+            self.alpha * F.mse_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
+            + (1 - self.alpha) * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
+        )
 
-        # Compute the specified metric
         metric = metric_fn(y_pred, y)
 
         return loss, metric
+

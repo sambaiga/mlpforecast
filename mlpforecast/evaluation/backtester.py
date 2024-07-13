@@ -215,20 +215,20 @@ class BacktestingForecast:
     def fit(
         self,
         data,
-        model,
+        model_instance,
         train_ratio=0.80,
         drop_last=False,
         num_worker=1,
         batch_size=64,
         pin_memory=True,
     ):
-        self.generator(df=data)
+        self.generator=self.generator(df=data)
         backtest_metrics, backtest_df = pd.DataFrame(), pd.DataFrame()
         for train_df, test_df, scheme, key in self.generator.split():
             f"{key}_cross_validation"
 
             logger.info(
-                f"---------------Fit  Backtesting expanding-{key + 1} \ 
+                f"---------------Fit  Backtesting expanding-{key + 1} \
                 Cross validation Training --------------------------"
             )
 
@@ -240,8 +240,8 @@ class BacktestingForecast:
                 f"Test_window: from {test_df[self.date_column].iloc[0]} to  {test_df[self.date_column].iloc[-1]}"
             )
 
-            model.filename = f"{key+1}_cross_validation"
-            model._create_folder()
+            filename = f"{key + 1}_cross_validation"
+            model = model_instance(filename=filename)
             model_copy = deepcopy(model)
             model_copy.fit(
                 train_df,
@@ -251,13 +251,12 @@ class BacktestingForecast:
                 batch_size=batch_size,
                 pin_memory=pin_memory,
             )
-            pred_df=model.predict(test_df)
-            metrics=model.metrics
-            metrics['Folds']=key+1
-            pred_df['Folds']=key+1
+            pred_df = model.predict(test_df)
+            metrics = model.metrics
+            metrics["Folds"] = key + 1
+            pred_df["Folds"] = key + 1
 
-            backtest_metrics=pd.concat([backtest_metrics, metrics], axis=0)
-            backtest_df=pd.concat([backtest_df, pred_df], axis=0)
+            backtest_metrics = pd.concat([backtest_metrics, metrics], axis=0)
+            backtest_df = pd.concat([backtest_df, pred_df], axis=0)
 
         return backtest_df, backtest_metrics
-            

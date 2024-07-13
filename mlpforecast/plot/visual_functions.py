@@ -19,13 +19,13 @@ def plot_prediction(ax, true, mu, date=None, true_max=None):
     date = np.arange(len(true)) if date is None else date
 
     # Plot true values
-    true_line, = ax.plot(date, true, ".", mec="#ff7f0e", mfc="None", label='True')
+    (true_line,) = ax.plot(date, true, ".", mec="#ff7f0e", mfc="None", label="True")
 
     # Plot predicted values
-    pred_line, = ax.plot(date, mu, c="#1f77b4", alpha=0.8, label='Pred')
+    (pred_line,) = ax.plot(date, mu, c="#1f77b4", alpha=0.8, label="Pred")
 
     # Set y-axis label
-    ax.set_ylabel('Power (W)')
+    ax.set_ylabel("Power (W)")
 
     # Auto-scale the axes tightly
     ax.autoscale(tight=True)
@@ -35,9 +35,12 @@ def plot_prediction(ax, true, mu, date=None, true_max=None):
         true_max = np.max(true)
 
     # Return axes, line objects, and labels
-    leg = ax.legend([true_line, pred_line], ['True', 'Pred'], \
-                    loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3)
-        
-        
-       
+    leg = ax.legend(
+        [true_line, pred_line],
+        ["True", "Pred"],
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.15),
+        ncol=3,
+    )
+
     return ax

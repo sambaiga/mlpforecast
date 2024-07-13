@@ -118,7 +118,7 @@ class PytorchForecast:
         callback = []
         pl.seed_everything(self.seed, workers=True)
         if self.trial is not None:
-            self.logger = True 
+            self.logger = True
             early_stopping = PyTorchLightningPruningCallback(
                 self.trial, monitor=self.metric
             )
@@ -235,8 +235,8 @@ class PytorchForecast:
                 self.datamodule.val_dataloader(),
             )
 
-            train_walltime = default_timer() - start_time
-            logging.info(f"training complete after {train_walltime / 60} minutes")
+            self.train_walltime = default_timer() - start_time
+            logging.info(f"training complete after {self.train_walltime / 60} minutes")
             return self.trainer.callback_metrics[self.metric].item()
 
         else:
@@ -247,9 +247,9 @@ class PytorchForecast:
                 ckpt_path=get_latest_checkpoint(self.checkpoints),
             )
             self.train_walltime = default_timer() - start_time
-            logging.info(f"""training complete after {self.train_walltime / 60} minutes""")
-
-           
+            logging.info(
+                f"""training complete after {self.train_walltime / 60} minutes"""
+            )
 
     def load_and_prepare_data(self, test_df, daily_feature):
         """Loads the checkpoint and prepares the ground truth data."""
@@ -327,7 +327,7 @@ class PytorchForecast:
 
         start_time = default_timer()
         pred = self.perform_prediction(test_df)
-        self.test_walltime=default_timer() - start_time
+        self.test_walltime = default_timer() - start_time
 
         # Inverse transform predictions
         scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
@@ -343,9 +343,9 @@ class PytorchForecast:
         self.metrics = self.evaluate_point_forecast(
             ground_truth, pred["pred"], time_stamp
         )
-        self.metrics['test-time']=self.test_walltime
-        self.metrics['train-time']=self.train_walltime
-        self.metrics['Model']=self.model_type.upper()
+        self.metrics["test-time"] = self.test_walltime
+        self.metrics["train-time"] = self.train_walltime
+        self.metrics["Model"] = self.model_type.upper()
 
         # Assert that the prediction and ground truth shapes are the same
         assert (
@@ -360,8 +360,6 @@ class PytorchForecast:
             self.model.data_pipeline.target_series,
             self.model.data_pipeline.date_column,
         )
-        results_df['Model']=self.model_type.upper()
-           
-        return results_df
+        results_df["Model"] = self.model_type.upper()
 
-    
+        return results_df
