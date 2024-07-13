@@ -49,7 +49,7 @@ out=model.predict(test_data)
 
 ## Examples
 
-You can find more examples and detailed usage in the examples directory.
+You can find more examples and detailed usage in the [examples directory](https://github.com/sambaiga/mlpforecast/blob/main/example/).
 
 ## Contributing
 
