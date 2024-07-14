@@ -1,0 +1,7 @@
+site_name: MLPF docs
+
+theme:
+  name: "material"
+
+plugins:
+  - mkdocstrings
