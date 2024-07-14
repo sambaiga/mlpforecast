@@ -42,10 +42,14 @@ out=model.predict(test_data)
 
 ```
 ## Features
-![alt text](images/prediction.png)
-- **Point Forecasting**: Generate single-point predictions for your data.
-- **Probabilistic Forecasting**: Provide probabilistic estimates for your predictions.
-- **Low Model Complexity**: Designed to minimize complexity while maintaining high performance.
+- **Point Forecasting**: Generate accurate single-point predictions for your time series data, ensuring precise future estimates.
+  ![alt text](images/prediction.png)
+
+- **Low Model Complexity**: Benefit from a design focused on minimizing complexity while maintaining high performance and accuracy, making it easier to deploy and maintain.
+  
+- **Hyperparameter Optimization**: Automatically optimize hyperparameters using the Optuna library, enhancing model performance and reducing manual tuning efforts.
+  
+- **Recursive Forecasting**: Achieve any desired forecast length by leveraging recursive forecasting techniques, which extend predictions iteratively over time.
 
 ## Examples
 

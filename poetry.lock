@@ -1596,13 +1596,13 @@ test = ["click (==8.1.7)", "cloudpickle (>=1.3,<3.0)", "coverage (==7.3.1)", "fa
 
 [[package]]
 name = "lightning-utilities"
-version = "0.11.3.post0"
+version = "0.11.4"
 description = "Lightning toolbox for across the our ecosystem."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "lightning_utilities-0.11.3.post0-py3-none-any.whl", hash = "sha256:2aec1d067e5ab61a8978f879998850a97f9a3764ee54aade329552706b0d189b"},
-    {file = "lightning_utilities-0.11.3.post0.tar.gz", hash = "sha256:7485fad0e3c5607a6bde4507935689c553a2c91325de2127b4bb8171a601e236"},
+    {file = "lightning_utilities-0.11.4-py3-none-any.whl", hash = "sha256:ac6035b8fd5a1f179e0eb03fe5f64a62203b70293060596f3ad8bd4d9dc25b75"},
+    {file = "lightning_utilities-0.11.4.tar.gz", hash = "sha256:7eba217205e3163e6217e47e1f403907ac4ccaad77d5ac876c66de2f8c945111"},
 ]
 
 [package.dependencies]
@@ -4391,4 +4391,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "bb27ba1f3b1a902b9edfd539eb6a50b54850a45910bb91f64aa5972c30cad636"
+content-hash = "19c3389c1b301e46ea7f15a8cc338c4c63b421b4fabc0f85a4d45cdffb39215d"
