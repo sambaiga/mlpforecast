@@ -2,6 +2,18 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+
+
+def _validate_target_series(target_series: list[str] | str) -> list[str]:
+    """ """
+    if isinstance(target_series, str):
+        return [target_series]
+    if isinstance(target_series, list) and all(
+        isinstance(ts, str) for ts in target_series
+    ):
+        return target_series
+    raise ValueError(f"{target_series} should be a string or a list of strings.")
 
 
 def get_n_sample_per_day(period):
@@ -315,3 +327,94 @@ def combine_past_future_exogenous(features: np.array, covariates: np.array = Non
         features = np.concatenate([features, covariates], axis=1)
 
     return features
+
+
+def extract_target_sequences(targets, input_window_size, forecast_horizon):
+    """
+    Extract sequences of target data for forecasting.
+
+    Parameters:
+    targets (np.ndarray): The target data array of shape (n_samples, n_features).
+    input_window_size (int): The size of the input window.
+    forecast_horizon (int): The forecast horizon.
+
+    Returns:
+    np.ndarray: The extracted target sequences of shape (n_sequences, forecast_horizon, n_features).
+    """
+    targets = np.squeeze(
+        np.lib.stride_tricks.sliding_window_view(
+            targets[input_window_size:],
+            (forecast_horizon, targets.shape[1]),
+        ),
+        axis=1,
+    )
+    return targets.reshape(targets.shape[0], forecast_horizon, -1)
+
+
+def extract_feature_sequences(features, input_window_size, forecast_horizon):
+    """
+    Extract sequences of feature data for forecasting.
+
+    Parameters:
+    features (np.ndarray): The feature data array of shape (n_samples, n_features).
+    input_window_size (int): The size of the input window.
+    forecast_horizon (int): The forecast horizon.
+
+    Returns:
+    np.ndarray: The extracted feature sequences of shape (n_sequences, input_window_size, n_features).
+    """
+    features = np.squeeze(
+        np.lib.stride_tricks.sliding_window_view(
+            features,
+            window_shape=(input_window_size, features.shape[1]),
+        ),
+        axis=1,
+    )
+    features = features.reshape(features.shape[0], input_window_size, -1)[
+        :-forecast_horizon
+    ]
+    return features
+
+
+def extract_daily_sequences(
+    data, input_window_size, forecast_horizon, target_mode=False
+):
+    """
+    Extract daily sequences of feature or target data for forecasting.
+
+    Parameters:
+    data (np.ndarray): The data array of shape (n_samples, n_features).
+    input_window_size (int): The size of the input window.
+    forecast_horizon (int): The forecast horizon.
+    target_mode (bool): Whether to extract target sequences instead of feature sequences.
+
+    Returns:
+    np.ndarray: The extracted sequences of shape (n_sequences, window_size, n_features).
+    """
+    nb_obs, nb_features = data.shape
+    list_range = range(
+        0, nb_obs - input_window_size - forecast_horizon + 1, forecast_horizon
+    )
+    num_sequences = len(list_range)
+
+    # Preallocate an array for the results
+    sequences_array = np.empty((
+        num_sequences,
+        forecast_horizon if target_mode else input_window_size,
+        nb_features,
+    ))
+
+    for idx, i in enumerate(tqdm(list_range, desc="Processing sequences")):
+        if target_mode:
+            sequences_array[idx] = np.expand_dims(
+                data[
+                    i + input_window_size : i + input_window_size + forecast_horizon, :
+                ],
+                axis=0,
+            )
+        else:
+            sequences_array[idx] = np.expand_dims(
+                data[i : i + input_window_size, :], axis=0
+            )
+
+    return sequences_array

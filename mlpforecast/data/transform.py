@@ -6,15 +6,13 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, MinMaxScaler
 
 from mlpforecast.data.processing import (
-    combine_past_future_exogenous,
-    fourier_series_t,
-    get_n_sample_per_day,
-)
-from mlpforecast.data.utils import (
     _validate_target_series,
+    combine_past_future_exogenous,
     extract_daily_sequences,
     extract_feature_sequences,
     extract_target_sequences,
+    fourier_series_t,
+    get_n_sample_per_day,
 )
 
 
