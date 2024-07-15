@@ -13,7 +13,6 @@ from mlpforecast.metrics.deterministic import evaluate_point_forecast
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Forecaster")
 import lightning as pl
-from optuna_integration.pytorch_lightning import PyTorchLightningPruningCallback
 from lightning.pytorch import loggers
 from lightning.pytorch.callbacks import (
     EarlyStopping,
@@ -21,10 +20,10 @@ from lightning.pytorch.callbacks import (
     ModelCheckpoint,
     RichProgressBar,
     TQDMProgressBar,
-    Timer,
-    DeviceStatsMonitor,
 )
 from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
+from optuna_integration.pytorch_lightning import PyTorchLightningPruningCallback
+
 from mlpforecast.data.loader import TimeseriesDataModule
 
 
@@ -119,34 +118,34 @@ class PytorchForecast:
         """
         Set up the PyTorch Lightning trainer with the necessary configurations and callbacks.
 
-        This method initializes the logger, sets up early stopping, model checkpointing, 
-        learning rate monitoring, and progress bar settings. It creates a trainer instance 
+        This method initializes the logger, sets up early stopping, model checkpointing,
+        learning rate monitoring, and progress bar settings. It creates a trainer instance
         that will be used for model training.
 
         Raises:
             ValueError: If the logger type is unsupported.
         """
-    
+
         # Initialize the callback list
         callback = []
 
-         # Set random seed for reproducibility
+        # Set random seed for reproducibility
         pl.seed_everything(self.seed, workers=True)
 
         # Initialize the logger
         if not self.wandb:
-                self.logger = loggers.TensorBoardLogger(
-                    save_dir=self.logs,
-                    version=(self.file_name if self.file_name is not None else 0),
-                )
+            self.logger = loggers.TensorBoardLogger(
+                save_dir=self.logs,
+                version=(self.file_name if self.file_name is not None else 0),
+            )
         else:
             self.logger = loggers.WandbLogger(
-                    save_dir=self.logs,
-                    name=self.file_name,
-                    project=self.exp_name,
-                    log_model="all",
-                )
-            
+                save_dir=self.logs,
+                name=self.file_name,
+                project=self.exp_name,
+                log_model="all",
+            )
+
         # Set up early stopping callback
         if self.trial is not None:
             early_stopping = PyTorchLightningPruningCallback(
@@ -163,21 +162,19 @@ class PytorchForecast:
                 check_on_train_epoch_end=True,
             )
             callback.append(early_stopping)
-            
-            
+
         # Create checkpoints directory if it doesn't exist
         self.checkpoints.mkdir(parents=True, exist_ok=True)
-    
+
         # Set up model checkpointing
         checkpoint_callback = ModelCheckpoint(
-                dirpath=self.checkpoints,
-                monitor=self.metric,
-                mode="min",
-                save_top_k=1,
-                filename="{epoch:02d}",
-            )
+            dirpath=self.checkpoints,
+            monitor=self.metric,
+            mode="min",
+            save_top_k=1,
+            filename="{epoch:02d}",
+        )
         callback.append(checkpoint_callback)
-
 
         lr_logger = LearningRateMonitor()
         callback.append(lr_logger)
@@ -229,44 +226,44 @@ class PytorchForecast:
             drop_last (bool, optional): Whether to drop the last incomplete batch. Default is True.
             num_worker (int, optional): Number of workers for data loading. Default is 1.
             batch_size (int, optional): Size of each batch for training. Default is 64.
-            pin_memory (bool, optional): If True, the data loader will copy Tensors into CUDA pinned memory. Default is True.
+            pin_memory (bool, optional): \
+                If True, the data loader will copy Tensors into CUDA pinned memory. Default is True.
 
         Returns:
             float: The training wall time or cost metric based on the training configuration.
-        
+
         Raises:
             ValueError: If the model instance is not initialized.
         """
-    
+
         # Check if the model instance is initialized
         if self.model is None:
             raise ValueError("Model instance is empty")
 
         # Set the checkpoint path for the model
         self.model.checkpoint_path = self.checkpoints
-        
+
         # Fit the data pipeline using the training DataFrame
         self.model.data_pipeline.fit(train_df.copy())
 
         # If no validation DataFrame is provided, split the training DataFrame
-        
 
         if val_df is None and train_ratio > 0.0:
-            self.train_df=train_df.copy()
+            self.train_df = train_df.copy()
             train_df, val_df = (
                 train_df.iloc[: int(train_ratio * len(train_df))],
                 train_df.iloc[int(train_ratio * len(train_df)) :],
             )
             self.metric = f"val_{self.model.hparams['metric']}"
             val_feature, val_target = self.model.data_pipeline.transform(val_df)
-        
+
         else:
             val_feature, val_target = None, None
             self.metric = f"train_{self.model.hparams['metric']}"
-            self.train_df =pd.concat([train_df.copy(), val_df.copy()], axis=0)
+            self.train_df = pd.concat([train_df.copy(), val_df.copy()], axis=0)
         # Transform the training data into features and targets
         train_feature, train_target = self.model.data_pipeline.transform(train_df)
-        
+
         # Initialize the TimeseriesDataModule
         self.datamodule = TimeseriesDataModule(
             train_inputs=train_feature,
@@ -280,21 +277,22 @@ class PytorchForecast:
         )
 
         # Sort the training DataFrame by the specified date column
-        self.train_df = self.train_df.sort_values(by=self.model.data_pipeline.date_column)
+        self.train_df = self.train_df.sort_values(
+            by=self.model.data_pipeline.date_column
+        )
 
         # Select the last 'max_data_drop' rows plus 'input_window_size' rows
         data_drop = self.model.data_pipeline.max_data_drop
         input_window = self.model.data_pipeline.input_window_size
-        self.train_df = self.train_df.iloc[-(data_drop+input_window):]
-        
-    
+        self.train_df = self.train_df.iloc[-(data_drop + input_window) :]
+
         # Set up the trainer
         self._set_up_trainer()
         start_time = default_timer()
         logger.info("""---------------Training started ---------------------------""")
-        
+
         # Train the model and log training duration
-       
+
         self.trainer.fit(
             self.model,
             self.datamodule.train_dataloader(),
@@ -304,18 +302,17 @@ class PytorchForecast:
 
         self.train_walltime = default_timer() - start_time
         logging.info(f"Training complete after {self.train_walltime / 60:.2f} minutes")
-        
+
         if self.trial is not None:
             # Make predictions and compute the cost metric for hyper-param optimisation
-            pred_df = self.predict(val_df)
-            cost = self.metrics.groupby('target')['MAE'].mean().iloc[-1].round(2)
-    
+            self.predict(val_df)
+            cost = self.metrics.groupby("target")["MAE"].mean().iloc[-1].round(2)
+
             return cost  # Return the computed cost metric
         else:
             return self.train_walltime
 
-    def load_and_prepare_data(self, test_df:pd.DataFrame, 
-                              daily_feature:str):
+    def load_and_prepare_data(self, test_df: pd.DataFrame, daily_feature: str):
         """Loads the checkpoint and prepares the ground truth data."""
         self.load_checkpoint()
         self.model.data_pipeline.daily_features = daily_feature
@@ -327,7 +324,7 @@ class PytorchForecast:
         )
         return ground_truth
 
-    def perform_prediction(self, test_df:pd.DataFrame):
+    def perform_prediction(self, test_df: pd.DataFrame):
         """Performs the model prediction."""
         features, _ = self.model.data_pipeline.transform(test_df.copy())
         features = torch.FloatTensor(features.copy())
@@ -336,12 +333,8 @@ class PytorchForecast:
         return self.model.forecast(features)
 
     def create_results_df(
-                        self, time_stamp, 
-                        ground_truth, 
-                        predictions, 
-                        target_series, 
-                        date_column
-                    ):
+        self, time_stamp, ground_truth, predictions, target_series, date_column
+    ):
         """Creates a DataFrame with the timestamp index and populates it with ground truth and forecasted values."""
         results_df = pd.DataFrame(index=pd.to_datetime(time_stamp.flatten(), unit="ns"))
         results_df.index.name = date_column
@@ -356,14 +349,12 @@ class PytorchForecast:
 
     def evaluate_point_forecast(self, ground_truth, pred, time_stamp):
         """Evaluates the point forecast."""
-        return evaluate_point_forecast(
-            {
-                "true": ground_truth,
-                "loc": pred,
-                "index": time_stamp,
-                "targets": self.model.data_pipeline.target_series,
-            }
-        )
+        return evaluate_point_forecast({
+            "true": ground_truth,
+            "loc": pred,
+            "index": time_stamp,
+            "targets": self.model.data_pipeline.target_series,
+        })
 
     def predict(self, test_df, daily_feature=True):
         """
@@ -376,8 +367,8 @@ class PytorchForecast:
         Returns:
             pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
         """
-        test_df=pd.concat([self.train_df, test_df], axis=0)
-        test_df=test_df.sort_values(by=self.model.data_pipeline.date_column)
+        test_df = pd.concat([self.train_df, test_df], axis=0)
+        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
 
         ground_truth = self.load_and_prepare_data(test_df, daily_feature)
         time_stamp = ground_truth[[self.model.data_pipeline.date_column]].values

@@ -146,13 +146,11 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         if self.unknown_features or self.known_continuous_features:
             numerical_features = self.unknown_features + self.known_continuous_features
             numeric_transformer = Pipeline(steps=[("scaler", self.input_scaler)])
-            transformers.append(
-                (
-                    "feat_scaler",
-                    numeric_transformer,
-                    numerical_features,
-                )
-            )
+            transformers.append((
+                "feat_scaler",
+                numeric_transformer,
+                numerical_features,
+            ))
 
         target_transformer = Pipeline(steps=[("target_scaler", self.target_scaler)])
         transformers.append(("target_scaler", target_transformer, self.target_series))
@@ -202,12 +200,10 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             self.exog_periods = [
                 len(np.unique(exog[:, size])) for size in range(exog.shape[-1])
             ]
-        seasonalities = np.hstack(
-            [
-                fourier_series_t(exog[:, i], self.exog_periods[i], 1)
-                for i in range(len(self.exog_periods))
-            ]
-        )
+        seasonalities = np.hstack([
+            fourier_series_t(exog[:, i], self.exog_periods[i], 1)
+            for i in range(len(self.exog_periods))
+        ])
         for i, col in enumerate(self.calendar_variables):
             data_transformed[f"{col}-sin"] = seasonalities[:, i]
             data_transformed[f"{col}-cosin"] = (

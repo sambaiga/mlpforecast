@@ -40,20 +40,25 @@ class MLPForecastModel(BaseForecastModel):
         gamma: float = 0.01,
         max_epochs: int = 10,
     ):
-        """
+        r"""
         Multilayer Perceptron (MLP) Forecast Model for time series forecasting.
 
         Args:
             data_pipeline (object, optional): Data pipeline object containing the series and features. Defaults to None.
             embedding_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
-            embedding_type (str, optional): Type of embedding to use. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'. Defaults to None.
-            combination_type (str, optional): Type of combination to use. Options: 'attn-comb', 'weighted-comb', 'addition-comb'. Defaults to 'attn-comb'.
+            embedding_type (str, optional): Type of embedding to use.\
+                  Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'. Defaults to None.
+            combination_type (str, optional): Type of combination to use. Options: \
+                'attn-comb', 'weighted-comb', 'addition-comb'. Defaults to 'attn-comb'.
             hidden_size (int, optional): Dimensionality of the hidden layers. Defaults to 64.
             num_layers (int, optional): Number of layers in the MLP. Defaults to 2.
             expansion_factor (int, optional): Factor to expand the size of layers. Defaults to 2.
-            residual (bool, optional): Whether to use residual connections. Defaults to False.
-            activation_function (str, optional): Activation function to use in the hidden layers. Defaults to "ReLU".
-            out_activation_function (str, optional): Activation function to use in the output layer. Defaults to "Identity".
+            residual (bool, optional):\
+              Whether to use residual connections. Defaults to False.
+            activation_function (str, optional): \
+                  Activation function to use in the hidden layers. Defaults to "ReLU".
+            out_activation_function (str, optional): Activation function to use in the output layer. \
+                Defaults to "Identity".
             dropout_rate (float, optional): Dropout rate for regularization. Defaults to 0.25.
             alpha (float, optional): Alpha parameter for the loss function. Defaults to 0.1.
             num_attention_heads (int, optional): Number of attention heads. Defaults to 4.

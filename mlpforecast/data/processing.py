@@ -216,13 +216,11 @@ def fourier_series_t(t, period, series_order):
     Returns:
         Matrix with seasonality features.
     """
-    features = np.column_stack(
-        [
-            fun(2.0 * (i + 1) * np.pi * t / period)
-            for i in range(series_order)
-            for fun in (np.sin, np.cos)
-        ]
-    )
+    features = np.column_stack([
+        fun(2.0 * (i + 1) * np.pi * t / period)
+        for i in range(series_order)
+        for fun in (np.sin, np.cos)
+    ])
     return features
 
 
@@ -244,8 +242,7 @@ def get_index(test_df, hparams, test=True):
         past_index.append(index[i : i + hparams["window_size"]])
         future_index.append(
             index[
-                i
-                + hparams["window_size"] : i
+                i + hparams["window_size"] : i
                 + hparams["window_size"]
                 + hparams["horizon"]
             ]
