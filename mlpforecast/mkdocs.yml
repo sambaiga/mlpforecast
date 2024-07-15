@@ -1,0 +1,12 @@
+site_name: MLPForecast Docs
+
+theme:
+  name: "material"
+
+plugins:
+  - mkdocstrings
+
+nav:
+  - MLPForecast Docs: index.md
+  - Tutorial - User Guide:
+    - MLPForecast: forecaster.md
