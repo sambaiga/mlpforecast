@@ -1,8 +1,11 @@
 from __future__ import annotations
-import numpy as np
+
 import logging
+
+import numpy as np
 import optuna
 from optuna import Trial
+
 from mlpforecast.forecaster.common import PytorchForecast
 from mlpforecast.forecaster.utils import get_latest_checkpoint
 from mlpforecast.model.deterministic import MLPForecastModel
@@ -57,7 +60,7 @@ class MLPForecast(PytorchForecast):
             gradient_clip_val=gradient_clip_val,
             rich_progress_bar=rich_progress_bar,
         )
-        self.hparams=hparams
+        self.hparams = hparams
         self.model = MLPForecastModel(**hparams)
 
     def load_checkpoint(self):
@@ -83,35 +86,35 @@ class MLPForecast(PytorchForecast):
         params = {}
 
         # Define integer hyperparameters
-        params["embedding_size"] = trial.suggest_int("embedding_size", 
-                                                     8, 64, step=2)
-        params["hidden_size"] = trial.suggest_int("hidden_size",
-                                                   8, 512, step=2)
-        params["num_layers"] = trial.suggest_int("num_layers",
-                                                  1, 5)
-        params["expansion_factor"] = trial.suggest_int("expansion_factor",
-                                                        1, 4)
-        
+        params["embedding_size"] = trial.suggest_int("embedding_size", 8, 64, step=2)
+        params["hidden_size"] = trial.suggest_int("hidden_size", 8, 512, step=2)
+        params["num_layers"] = trial.suggest_int("num_layers", 1, 5)
+        params["expansion_factor"] = trial.suggest_int("expansion_factor", 1, 4)
+
         # Define categorical hyperparameters
-        params["embedding_type"] = trial.suggest_categorical("embedding_type", 
-                                    [None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'])
-        params["combination_type"] = trial.suggest_categorical("combination_type", 
-                                        ["addition-comb", "weighted-comb"])
-        params["residual"] = trial.suggest_categorical("residual", 
-                                                       [True, False])
-        params["activation_function"] = trial.suggest_categorical("activation_function", 
-                                                                  ACTIVATIONS)
-        params["out_activation_function"] = trial.suggest_categorical("out_activation_function", 
-                                                                      ACTIVATIONS)
+        params["embedding_type"] = trial.suggest_categorical(
+            "embedding_type", [None, "PosEmb", "RotaryEmb", "CombinedEmb"]
+        )
+        params["combination_type"] = trial.suggest_categorical(
+            "combination_type", ["addition-comb", "weighted-comb"]
+        )
+        params["residual"] = trial.suggest_categorical("residual", [True, False])
+        params["activation_function"] = trial.suggest_categorical(
+            "activation_function", ACTIVATIONS
+        )
+        params["out_activation_function"] = trial.suggest_categorical(
+            "out_activation_function", ACTIVATIONS
+        )
 
         # Define float hyperparameters
-        params["dropout_rate"] = trial.suggest_float("dropout_rate", 0.0, 0.9, step=0.05)
+        params["dropout_rate"] = trial.suggest_float(
+            "dropout_rate", 0.0, 0.9, step=0.05
+        )
         params["alpha"] = trial.suggest_float("alpha", 0.0, 1, step=0.05)
 
         return params
-    
-    def auto_tune(self, train_df, val_df, 
-                  num_trial=10, reduction_factor=3, patience=2):
+
+    def auto_tune(self, train_df, val_df, num_trial=10, reduction_factor=3, patience=2):
         """
         Perform hyperparameter tuning using Optuna.
 
@@ -132,7 +135,7 @@ class MLPForecast(PytorchForecast):
 
         def objective(trial):
             params = self.get_search_params(trial)
-            
+
             self.hparams.update(params)
             model = MLPForecast(
                 self.hparams,
@@ -140,9 +143,9 @@ class MLPForecast(PytorchForecast):
                 seed=42,
                 trial=trial,
                 rich_progress_bar=True,
-                file_name=trial.number
+                file_name=trial.number,
             )
-            
+
             val_cost = model.fit(self.train_df, self.validation_df)
             return val_cost
 
@@ -167,6 +170,4 @@ class MLPForecast(PytorchForecast):
             callbacks=[print_callback],
         )
         self.hparams.update(study.best_trial.params)
-        np.save(
-            f"{self.results_path}/best_params.npy", study.best_trial.params
-        )
+        np.save(f"{self.results_path}/best_params.npy", study.best_trial.params)
