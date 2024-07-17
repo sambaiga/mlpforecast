@@ -284,6 +284,7 @@ class PytorchForecast:
         # Select the last 'max_data_drop' rows plus 'input_window_size' rows
         data_drop = self.model.data_pipeline.max_data_drop
         input_window = self.model.data_pipeline.input_window_size
+
         self.train_df = self.train_df.iloc[-(data_drop + input_window) :]
 
         # Set up the trainer
@@ -356,7 +357,7 @@ class PytorchForecast:
             "targets": self.model.data_pipeline.target_series,
         })
 
-    def predict(self, test_df, daily_feature=True):
+    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
         """
         Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
 
@@ -367,7 +368,8 @@ class PytorchForecast:
         Returns:
             pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
         """
-        test_df = pd.concat([self.train_df, test_df], axis=0)
+        if test_df is not None:
+            test_df = pd.concat([self.train_df, test_df], axis=0)
         test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
 
         ground_truth = self.load_and_prepare_data(test_df, daily_feature)
