@@ -1,13 +1,5 @@
 # mlpForecaster(MLPF)
 
-<div align="center">
-
-[![Python](https://img.shields.io/pypi/pyversions/perceptron-forecaster)](https://pypi.org/project/perceptron-forecaster/)
-[![PyPi](https://img.shields.io/pypi/v/perceptron-forecaster?color=blue)](https://pypi.org/project/perceptron-forecaster/)
-[![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square)](#contributors-)
-
-</div>
-
 **MLPF** is a simple and efficient architecture for providing point and probabilistic forecasting. The architecture has been designed to minimize model complexity while improving forecasting performance.
 
 ## Table of Contents

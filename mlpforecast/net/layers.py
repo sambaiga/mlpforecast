@@ -166,11 +166,6 @@ class MLPBlock(nn.Module):
         return x
 
 
-import torch.nn as nn
-
-from mlpforecast.net.layers import MLPBlock, PosEmbedding, RotaryEmbedding
-
-
 class PastFutureEncoder(nn.Module):
     def __init__(
         self,
@@ -190,7 +185,8 @@ class PastFutureEncoder(nn.Module):
 
         Args:
             embedding_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
-            embedding_type (str, optional): Type of embedding to use. Defaults to None. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'.
+            embedding_type (str, optional): Type of embedding to use. \
+                Defaults to None. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'.
             latent_size (int, optional): Dimensionality of the latent space. Defaults to 64.
             num_layers (int, optional): Number of layers in the MLP. Defaults to 2.
             residual (bool, optional): Whether to use residual connections in the MLP. Defaults to False.
@@ -294,9 +290,12 @@ class MLPForecastNetwork(nn.Module):
             n_unknown_features (int): Number of unknown time-varying features.
             n_known_calendar_features (int): Number of known categorical time-varying features.
             n_known_continuous_features (int): Number of known continuous time-varying features.
-            embedding_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
-            embedding_type (str, optional): Type of embedding to use. Defaults to None. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'.
-            combination_type (str, optional): Type of combination to use. Defaults to 'attn-comb'. Options: 'attn-comb', 'weighted-comb', 'addition-comb'.
+            embedding_size (int, optional): Dimensionality of the embedding space. \
+            Defaults to 28.
+            embedding_type (str, optional): Type of embedding to use. \
+                Defaults to None. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'.
+            combination_type (str, optional): Type of combination to use.\
+                  Defaults to 'attn-comb'. Options: 'attn-comb', 'weighted-comb', 'addition-comb'.
             expansion_factor (int, optional): Expansion factor for the encoder. Defaults to 2.
             residual (bool, optional): Whether to use residual connections in the encoder. Defaults to False.
             hidden_size (int, optional): Dimensionality of the hidden layers. Defaults to 256.
@@ -318,12 +317,15 @@ class MLPForecastNetwork(nn.Module):
         assert (
             out_activation_function in ACTIVATIONS
         ), f"Invalid out_activation_function. Please select from: {ACTIVATIONS}"
-        assert embedding_type in [
-            None,
-            "PosEmb",
-            "RotaryEmb",
-            "CombinedEmb",
-        ], "Invalid embedding type, choose from: None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'"
+        assert (
+            embedding_type
+            in [
+                None,
+                "PosEmb",
+                "RotaryEmb",
+                "CombinedEmb",
+            ]
+        ), "Invalid embedding type, choose from: None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'"
 
         self.n_out = n_target_series
         self.n_unknown = n_unknown_features + self.n_out
@@ -364,11 +366,14 @@ class MLPForecastNetwork(nn.Module):
         self.combination_type = combination_type
         self.alpha = alpha
 
-        assert combination_type in [
-            "attn-comb",
-            "weighted-comb",
-            "addition-comb",
-        ], "Invalid combination type, choose from: 'attn-comb', 'weighted-comb', 'addition-comb'"
+        assert (
+            combination_type
+            in [
+                "attn-comb",
+                "weighted-comb",
+                "addition-comb",
+            ]
+        ), "Invalid combination type, choose from: 'attn-comb', 'weighted-comb', 'addition-comb'"
 
         if combination_type == "attn-comb":
             self.attention = nn.MultiheadAttention(

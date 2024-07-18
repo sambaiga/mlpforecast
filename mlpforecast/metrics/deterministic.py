@@ -44,17 +44,20 @@ def get_smape(y, y_hat, axis=0):
     Args:
         y (ndarray): The true values.
         y_hat (ndarray): The predicted values.
-        axis (int, optional): The axis along which to compute the SMAPE. Default is 0.
+        axis (int, optional): \
+              The axis along which to compute the SMAPE. Default is 0.
 
     Returns:
         float: The symmetric mean absolute percentage error value.
     """
-    epsilon = np.finfo(np.float64).eps  # Small value to avoid division by zero
-    scale = np.abs(y) + np.abs(y_hat)  # Sum of absolute true and predicted values
+    epsilon = np.finfo(np.float64).eps
+    # Small value to avoid division by zero
+    scale = np.abs(y) + np.abs(y_hat)
+    # Sum of absolute true and predicted values
     output_errors = 2 * (
         np.abs(y - y_hat) / np.maximum(scale, epsilon)
     )  # SMAPE calculation
-    return np.average(output_errors, axis=axis)  # Average of output errors along
+    return np.average(output_errors, axis=axis)
 
 
 def get_pointwise_metrics(pred: np.array, true: np.array, target_range: float = None):
@@ -89,13 +92,13 @@ def get_pointwise_metrics(pred: np.array, true: np.array, target_range: float = 
         "RMSE": rmse,
         "NRMSE": nrmse,
         "MAE": mae,
-        "MAPE": mape,
+        "MAPE(%)": mape * 100,
         "CORR": corr,
         "MAX-error": max_res,
         "D2-error": d2_err,
         "NBIAS": nbias,
         "R2-error": r2,
-        "SMAPE": smape,
+        "SMAPE(%)": smape * 100,
     }
 
 

@@ -12,17 +12,17 @@ from mlpforecast.metrics.deterministic import evaluate_point_forecast
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Forecaster")
-import pytorch_lightning as pl
-from optuna_integration.pytorch_lightning import PyTorchLightningPruningCallback
-from pytorch_lightning import loggers
-from pytorch_lightning.callbacks import (
+import lightning as pl
+from lightning.pytorch import loggers
+from lightning.pytorch.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
     ModelCheckpoint,
     RichProgressBar,
     TQDMProgressBar,
 )
-from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
+from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
+from optuna_integration.pytorch_lightning import PyTorchLightningPruningCallback
 
 from mlpforecast.data.loader import TimeseriesDataModule
 
@@ -115,10 +115,39 @@ class PytorchForecast:
         self.checkpoints.mkdir(parents=True, exist_ok=True)
 
     def _set_up_trainer(self):
+        """
+        Set up the PyTorch Lightning trainer with the necessary configurations and callbacks.
+
+        This method initializes the logger, sets up early stopping, model checkpointing,
+        learning rate monitoring, and progress bar settings. It creates a trainer instance
+        that will be used for model training.
+
+        Raises:
+            ValueError: If the logger type is unsupported.
+        """
+
+        # Initialize the callback list
         callback = []
+
+        # Set random seed for reproducibility
         pl.seed_everything(self.seed, workers=True)
+
+        # Initialize the logger
+        if not self.wandb:
+            self.logger = loggers.TensorBoardLogger(
+                save_dir=self.logs,
+                version=(self.file_name if self.file_name is not None else 0),
+            )
+        else:
+            self.logger = loggers.WandbLogger(
+                save_dir=self.logs,
+                name=self.file_name,
+                project=self.exp_name,
+                log_model="all",
+            )
+
+        # Set up early stopping callback
         if self.trial is not None:
-            self.logger = True
             early_stopping = PyTorchLightningPruningCallback(
                 self.trial, monitor=self.metric
             )
@@ -133,32 +162,22 @@ class PytorchForecast:
                 check_on_train_epoch_end=True,
             )
             callback.append(early_stopping)
-            if not self.wandb:
-                self.logger = loggers.TensorBoardLogger(
-                    save_dir=self.logs,
-                    version=(self.file_name if self.file_name is not None else 0),
-                )
-            else:
-                self.logger = loggers.WandbLogger(
-                    save_dir=self.logs,
-                    name=self.file_name,
-                    project=self.exp_name,
-                    log_model="all",
-                )
-                # self.logger.watch(self.model)
-                # log gradients and model topology
 
-            self.checkpoints.mkdir(parents=True, exist_ok=True)
-            checkpoint_callback = ModelCheckpoint(
-                dirpath=self.checkpoints,
-                monitor=self.metric,
-                mode="min",
-                save_top_k=1,
-                filename="{epoch:02d}",
-            )
-            callback.append(checkpoint_callback)
-            lr_logger = LearningRateMonitor()
-            callback.append(lr_logger)
+        # Create checkpoints directory if it doesn't exist
+        self.checkpoints.mkdir(parents=True, exist_ok=True)
+
+        # Set up model checkpointing
+        checkpoint_callback = ModelCheckpoint(
+            dirpath=self.checkpoints,
+            monitor=self.metric,
+            mode="min",
+            save_top_k=1,
+            filename="{epoch:02d}",
+        )
+        callback.append(checkpoint_callback)
+
+        lr_logger = LearningRateMonitor()
+        callback.append(lr_logger)
 
         if self.rich_progress_bar:
             progress_bar = RichProgressBar(
@@ -192,28 +211,60 @@ class PytorchForecast:
         train_df,
         val_df=None,
         train_ratio=0.80,
-        drop_last=False,
+        drop_last=True,
         num_worker=1,
         batch_size=64,
         pin_memory=True,
     ):
+        """
+        Fit the model using the provided training DataFrame.
+
+        Args:
+            train_df (pd.DataFrame): The training data.
+            val_df (pd.DataFrame, optional): The validation data. If None, will split train_df based on train_ratio.
+            train_ratio (float, optional): Proportion of data to use for training. Default is 0.80.
+            drop_last (bool, optional): Whether to drop the last incomplete batch. Default is True.
+            num_worker (int, optional): Number of workers for data loading. Default is 1.
+            batch_size (int, optional): Size of each batch for training. Default is 64.
+            pin_memory (bool, optional): \
+                If True, the data loader will copy Tensors into CUDA pinned memory. Default is True.
+
+        Returns:
+            float: The training wall time or cost metric based on the training configuration.
+
+        Raises:
+            ValueError: If the model instance is not initialized.
+        """
+
+        # Check if the model instance is initialized
         if self.model is None:
             raise ValueError("Model instance is empty")
+
+        # Set the checkpoint path for the model
         self.model.checkpoint_path = self.checkpoints
+
+        # Fit the data pipeline using the training DataFrame
         self.model.data_pipeline.fit(train_df.copy())
 
+        # If no validation DataFrame is provided, split the training DataFrame
+
         if val_df is None and train_ratio > 0.0:
+            self.train_df = train_df.copy()
             train_df, val_df = (
                 train_df.iloc[: int(train_ratio * len(train_df))],
                 train_df.iloc[int(train_ratio * len(train_df)) :],
             )
             self.metric = f"val_{self.model.hparams['metric']}"
             val_feature, val_target = self.model.data_pipeline.transform(val_df)
+
         else:
             val_feature, val_target = None, None
             self.metric = f"train_{self.model.hparams['metric']}"
-
+            self.train_df = pd.concat([train_df.copy(), val_df.copy()], axis=0)
+        # Transform the training data into features and targets
         train_feature, train_target = self.model.data_pipeline.transform(train_df)
+
+        # Initialize the TimeseriesDataModule
         self.datamodule = TimeseriesDataModule(
             train_inputs=train_feature,
             train_targets=train_target,
@@ -225,34 +276,44 @@ class PytorchForecast:
             pin_memory=pin_memory,
         )
 
+        # Sort the training DataFrame by the specified date column
+        self.train_df = self.train_df.sort_values(
+            by=self.model.data_pipeline.date_column
+        )
+
+        # Select the last 'max_data_drop' rows plus 'input_window_size' rows
+        data_drop = self.model.data_pipeline.max_data_drop
+        input_window = self.model.data_pipeline.input_window_size
+
+        self.train_df = self.train_df.iloc[-(data_drop + input_window) :]
+
+        # Set up the trainer
         self._set_up_trainer()
         start_time = default_timer()
         logger.info("""---------------Training started ---------------------------""")
+
+        # Train the model and log training duration
+
+        self.trainer.fit(
+            self.model,
+            self.datamodule.train_dataloader(),
+            self.datamodule.val_dataloader(),
+            ckpt_path=get_latest_checkpoint(self.checkpoints),
+        )
+
+        self.train_walltime = default_timer() - start_time
+        logging.info(f"Training complete after {self.train_walltime / 60:.2f} minutes")
+
         if self.trial is not None:
-            self.trainer.fit(
-                self.model,
-                self.datamodule.train_dataloader(),
-                self.datamodule.val_dataloader(),
-            )
+            # Make predictions and compute the cost metric for hyper-param optimisation
+            self.predict(val_df)
+            cost = self.metrics.groupby("target")["MAE"].mean().iloc[-1].round(2)
 
-            self.train_walltime = default_timer() - start_time
-            logging.info(f"training complete after {self.train_walltime / 60} minutes")
-            return self.trainer.callback_metrics[self.metric].item()
-
+            return cost  # Return the computed cost metric
         else:
-            self.trainer.fit(
-                self.model,
-                self.datamodule.train_dataloader(),
-                self.datamodule.val_dataloader(),
-                ckpt_path=get_latest_checkpoint(self.checkpoints),
-            )
-            self.train_walltime = default_timer() - start_time
-            logging.info(
-                f"""training complete after {self.train_walltime / 60} minutes"""
-            )
             return self.train_walltime
 
-    def load_and_prepare_data(self, test_df, daily_feature):
+    def load_and_prepare_data(self, test_df: pd.DataFrame, daily_feature: str):
         """Loads the checkpoint and prepares the ground truth data."""
         self.load_checkpoint()
         self.model.data_pipeline.daily_features = daily_feature
@@ -264,7 +325,7 @@ class PytorchForecast:
         )
         return ground_truth
 
-    def perform_prediction(self, test_df):
+    def perform_prediction(self, test_df: pd.DataFrame):
         """Performs the model prediction."""
         features, _ = self.model.data_pipeline.transform(test_df.copy())
         features = torch.FloatTensor(features.copy())
@@ -289,16 +350,14 @@ class PytorchForecast:
 
     def evaluate_point_forecast(self, ground_truth, pred, time_stamp):
         """Evaluates the point forecast."""
-        return evaluate_point_forecast(
-            {
-                "true": ground_truth,
-                "loc": pred,
-                "index": time_stamp,
-                "targets": self.model.data_pipeline.target_series,
-            }
-        )
+        return evaluate_point_forecast({
+            "true": ground_truth,
+            "loc": pred,
+            "index": time_stamp,
+            "targets": self.model.data_pipeline.target_series,
+        })
 
-    def predict(self, test_df, daily_feature=True):
+    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
         """
         Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
 
@@ -309,6 +368,10 @@ class PytorchForecast:
         Returns:
             pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
         """
+        if test_df is not None:
+            test_df = pd.concat([self.train_df, test_df], axis=0)
+        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
+
         ground_truth = self.load_and_prepare_data(test_df, daily_feature)
         time_stamp = ground_truth[[self.model.data_pipeline.date_column]].values
         ground_truth = ground_truth[self.model.data_pipeline.target_series].values
