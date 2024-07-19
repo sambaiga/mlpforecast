@@ -10,4 +10,7 @@ nav:
   - MLPForecast Docs: index.md
   - Tutorial - User Guide:
     - MLPForecast: forecaster.md
+    - Model: model.md
+    - Net: net.md
     - Evaluation: evaluation.md
+    - Metrics: metrics.md

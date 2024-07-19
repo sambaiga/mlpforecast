@@ -16,6 +16,16 @@ logger = logging.getLogger("MLPF")
 
 
 class MLPForecast(PytorchForecast):
+    """
+    MLP Forecasting class for managing training, evaluation, and prediction.
+
+    Attributes:
+        hparams (dict): Hyperparameters for the MLP model.
+        model (MLPForecastModel): PyTorch model.
+        train_df (pd.DataFrame): Training DataFrame.
+        validation_df (pd.DataFrame): Validation DataFrame.
+    """
+    
     def __init__(
         self,
         hparams: dict,

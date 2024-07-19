@@ -10,6 +10,16 @@ logger = logging.getLogger("MLPF")
 
 
 class MLPForecastModel(BaseForecastModel):
+    """
+    MLP Forecast Model for time series point forecasting.
+
+    Attributes:
+        n_out (int): Number of output series.
+        n_channels (int): Number of input channels.
+        model (object): Model object.
+        hparams (dict): Hyperparameters for the model.
+    """
+
     def __init__(
         self,
         data_pipeline=None,
@@ -122,6 +132,7 @@ class MLPForecastModel(BaseForecastModel):
             num_attention_heads=num_attention_heads,
         )
 
+
     def forecast(self, x):
         """
         Generate forecast for the given input.
@@ -134,8 +145,16 @@ class MLPForecastModel(BaseForecastModel):
         """
         return self.model.forecast(x)
 
+
     def forward(self, x):
+        """
+        Forward pass of the model.
+
+        Args:
+            x (tensor): Input data.
+        """
         return self.model(x)
+
 
     def training_step(self, batch, batch_idx):
         """
@@ -153,6 +172,7 @@ class MLPForecastModel(BaseForecastModel):
         self.log(f"train_{self.hparams['metric']}", metric, prog_bar=True, logger=True)
         return loss
 
+
     def validation_step(self, batch, batch_idx):
         """
         Perform a single validation step.
@@ -167,6 +187,7 @@ class MLPForecastModel(BaseForecastModel):
         loss, metric = self.model.step(batch, self.val_metric_fcn)
         self.log("val_loss", loss, prog_bar=True, logger=True)
         self.log(f"val_{self.hparams['metric']}", metric, prog_bar=True, logger=True)
+
 
     def configure_optimizers(self):
         """

@@ -12,13 +12,13 @@ def sinusoids(length, channels, max_timescale=10000):
     """
     Returns sinusoids for positional embedding.
 
-    Parameters:
-    - length (int): Length of the sequence.
-    - channels (int): Number of channels in the positional embeddings. It should be an even number.
-    - max_timescale (int, optional): Maximum timescale for the sinusoids. Defaults to 10000.
+    Args:
+        length (int): Length of the sequence.
+        channels (int): Number of channels in the positional embeddings. It should be an even number.
+        max_timescale (int, optional): Maximum timescale for the sinusoids. Defaults to 10000.
 
     Returns:
-    torch.Tensor: Sinusoidal positional embeddings.
+        torch.Tensor: Sinusoidal positional embeddings.
     """
     assert channels % 2 == 0
     log_timescale_increment = np.log(max_timescale) / (channels // 2 - 1)
@@ -31,11 +31,11 @@ def rotate_half(x):
     """
     Rotate the input tensor along the last dimension by half.
 
-    Parameters:
-    - x (torch.Tensor): Input tensor.
+    Args:
+        x (torch.Tensor): Input tensor.
 
     Returns:
-    torch.Tensor: Rotated tensor.
+        torch.Tensor: Rotated tensor.
     """
     x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2 :]
     return torch.cat(
@@ -47,12 +47,20 @@ class Rotary(torch.nn.Module):
     """
     Rotary positional embedding module.
 
-    Parameters:
-    - dim (int): Dimension of the input embeddings.
-    - base (int, optional): Base value for frequency calculation. Defaults to 10000.
+    Attributes:
+        seq_len_cached (int): Cached sequence length.
+        cos_cached (torch.Tensor): Cached cosine values.
+        sin_cached (torch.Tensor): Cached sine values.
     """
 
     def __init__(self, dim, base=10000):
+        """
+        Initializes the Rotary positional embedding module.
+
+        Args:
+            dim (int): Dimension of the input embeddings.
+            base (int, optional): Base value for frequency calculation. Defaults to 10000.
+        """
         super().__init__()
         inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
         self.register_buffer("inv_freq", inv_freq)
@@ -64,12 +72,12 @@ class Rotary(torch.nn.Module):
         """
         Forward pass of the rotary positional embedding module.
 
-        Parameters:
-        - inputs (torch.Tensor): Input tensor.
-        - seq_dim (int, optional): Dimension representing the sequence length. Defaults to 1.
+        Args:
+            inputs (torch.Tensor): Input tensor.
+            seq_dim (int, optional): Dimension representing the sequence length. Defaults to 1.
 
         Returns:
-        torch.Tensor: Rotary positional embeddings.
+            torch.Tensor: Rotary positional embeddings.
         """
         x = inputs.unsqueeze(2)
         seq_len = x.shape[seq_dim]
@@ -101,7 +109,6 @@ def Conv1DLayer(in_channels, out_channels, bias=True):
 
     Returns:
         nn.Module: 1D convolutional layer.
-
     """
     # Create a 1D convolutional layer with specified parameters
     m = nn.Conv1d(in_channels, out_channels, kernel_size=3, padding=1, bias=bias)
@@ -120,14 +127,20 @@ class PosEmbedding(nn.Module):
     """
     Positional Embedding module that combines convolutional and sinusoidal embeddings.
 
-    Args:
-        n_channels (int): Number of input channels.
+    Attributes:
+        emb (Conv1DLayer): Convolutional positional embedding module.
         d_model (int): Dimension of the model.
-        window_size (int): Size of the window for sinusoidal positional embedding.
-
     """
 
     def __init__(self, n_channels, d_model, window_size):
+        """
+        Initializes the PosEmbedding module.
+
+        Args:
+            n_channels (int): Number of input channels.
+            d_model (int): Dimension of the model.
+            window_size (int): Size of the input window
+        """
         super().__init__()
         # Convolutional embedding layer
         self.emb = Conv1DLayer(n_channels, d_model)
@@ -147,7 +160,6 @@ class PosEmbedding(nn.Module):
 
         Returns:
             torch.Tensor: Output tensor after applying positional embedding.
-
         """
         # Apply convolutional embedding, ReLU activation, and scale by sqrt(d_model)
         x = F.relu(self.emb(x.permute(0, 2, 1)).permute(0, 2, 1)) * math.sqrt(
@@ -163,15 +175,21 @@ class RotaryEmbedding(nn.Module):
     """
     Rotary Embedding module.
 
-    Args:
-        d_model (int): Dimension of the model.
-
+    Attributes:
+        emb (Rotary): Rotary positional embedding module.
     """
 
     def __init__(self, d_model):
+        """
+        Initializes the RotaryEmbedding module.
+
+        Args:   
+            d_model (int): Dimension of the model.
+        """
         super().__init__()
         # Rotary embedding layer
         self.emb = Rotary(d_model)
+
 
     def forward(self, x):
         """
@@ -182,7 +200,6 @@ class RotaryEmbedding(nn.Module):
 
         Returns:
             torch.Tensor: Output tensor after applying rotary embedding.
-
         """
         x = self.emb(x)
         return x

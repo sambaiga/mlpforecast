@@ -3,8 +3,6 @@ an **information-oriented** approach. Use it as a
 reference for the technical implementation of the
 `mlpForecaster` project code.
 
-::: forecaster.mlp
+::: model.deterministic
 
-::: forecaster.common
-
-::: forecaster.utils
+::: model.base_model
