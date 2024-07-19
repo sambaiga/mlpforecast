@@ -1,7 +1,10 @@
 import glob
 import os
 
-from mlpforecast.data.utils import extract_daily_sequences, extract_target_sequences
+from mlpforecast.data.processing import (
+    extract_daily_sequences,
+    extract_target_sequences,
+)
 
 
 def format_target(targets, input_window_size, forecast_horizon, daily_feature=True):
