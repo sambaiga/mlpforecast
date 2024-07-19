@@ -14,3 +14,5 @@ nav:
     - Net: net.md
     - Evaluation: evaluation.md
     - Metrics: metrics.md
+    - Plot: plot.md
+    - Stats: stats.md

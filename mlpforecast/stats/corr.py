@@ -8,12 +8,7 @@ from mlpforecast.plot.visual_functions import plot_correlation, scatter_plot
 
 class CorrelationAnalyzer:
     """
-    Class to calculate different types of correlations: Pearson, PPS, or Xi.
-
-    Methods
-    -------
-    calculate(data, variable_col, target_col, method='pearson', ties='auto')
-        Calculates the specified correlation measure between the target column and other variables.
+    A class to calculate and visualize the correlation between variables in a data frame.
     """
 
     @staticmethod
@@ -27,33 +22,31 @@ class CorrelationAnalyzer:
         n_sample=None,
     ):
         """
-        Calculate the specified correlation measure between the target column and other variables.
+        Calculate the correlation between the target column and other variables in the data frame.
 
-        Parameters
-        ----------
-        data : pandas.DataFrame
-            The data frame containing the data.
-        variable_col : list of str
-            List of column names to be used as independent variables.
-        target_col : str
-            The name of the dependent variable column.
-        method : str, optional
-            The correlation measure to use: 'pearson', 'ppscore', or 'xicor' (default is 'pearson').
-        ties : {'auto', bool}, optional
-            How to handle ties in Xi correlation calculation:
-            - 'auto' (default): Decide based on the uniqueness of y values.
-            - True: Assume ties are present.
-            - False: Assume no ties are present.
+        Args:
+            data (pandas.DataFrame): The data frame containing the data.
+            variable_col (list of str): List of column names to be used as independent variables.
+            target_col (str): The name of the dependent variable column.
+            method (str, optional): The method to use for calculating the correlation:
+                - 'scatter' (default): Scatter plot.
+                - 'pearson': Pearson correlation.
+                - 'kendall': Kendall rank correlation.
+                - 'spearman': Spearman rank correlation.
+                - 'ppscore': Predictive Power Score (PPS).
+                - 'xicor': Xi correlation.
+            ties (str or bool, optional): How to handle ties in Xi correlation calculation:
+                - 'auto' (default): Decide based on the uniqueness of y values.
+                - True: Assume ties are present.
+                - False: Assume no ties are present.
+            hue_col (str, optional): The column in `data` to use for color grouping.
+            n_sample (int, optional): The number of samples to use for the scatter
 
-        Returns
-        -------
-        pandas.DataFrame
-            DataFrame containing the correlation measure between the target column and each variable.
+        Returns:
+            pandas.DataFrame: DataFrame containing the correlation between the target column and each variable.
 
-        Raises
-        ------
-        ValueError
-            If an unsupported method is provided.
+        Raises:
+            ValueError: If the method is not supported.
         """
         if method == "scatter":
             return scatter_plot(
@@ -74,6 +67,14 @@ class CorrelationAnalyzer:
 
     @staticmethod
     def plot(ax, corr_df):
+        """
+        Plot the correlation data using a heatmap.
+
+        Args:
+            ax (matplotlib.axes.Axes): The axes on which to plot the heatmap.
+            corr_df (pandas.DataFrame): DataFrame containing the correlation data with three columns: \
+                    two for the pairs of items and one for the correlation values.
+        """
         return plot_correlation(ax, corr_df)
 
     @staticmethod
@@ -81,19 +82,13 @@ class CorrelationAnalyzer:
         """
         Calculate the Pearson correlation between the target column and other variables.
 
-        Parameters
-        ----------
-        data : pandas.DataFrame
-            The data frame containing the data.
-        variable_col : list of str
-            List of column names to be used as independent variables.
-        target_col : str
-            The name of the dependent variable column.
+        Args:
+            data (pandas.DataFrame): The data frame containing the data.
+            variable_col (list of str): List of column names to be used as independent variables.
+            target_col (str): The name of the dependent variable column.
 
-        Returns
-        -------
-        pandas.DataFrame
-            DataFrame containing the Pearson correlation between the target column and each variable.
+        Returns:
+            pandas.DataFrame: DataFrame containing the Pearson correlation between the target column and each variable.
         """
         non_zero_varlist = [target_col] + variable_col
         correlations = (
@@ -112,19 +107,13 @@ class CorrelationAnalyzer:
         """
         Calculate the Predictive Power Score (PPS) between the target column and other variables.
 
-        Parameters
-        ----------
-        data : pandas.DataFrame
-            The data frame containing the data.
-        variable_col : list of str
-            List of column names to be used as independent variables.
-        target_col : str
-            The name of the dependent variable column.
+        Args:
+            data (pandas.DataFrame): The data frame containing the data.
+            variable_col (list of str): List of column names to be used as independent variables.
+            target_col (str): The name of the dependent variable column.
 
-        Returns
-        -------
-        pandas.DataFrame
-            DataFrame containing the PPS between the target column and each variable.
+        Returns:
+            pandas.DataFrame: DataFrame containing the PPS between the target column and each variable.
         """
         _pscore = pps.predictors(data[variable_col + [target_col]], y=target_col)
         _pscore = _pscore[["y", "x", "ppscore"]]
@@ -136,24 +125,13 @@ class CorrelationAnalyzer:
         """
         Calculate the Xi correlation for multiple variable-target pairs and return a sorted DataFrame.
 
-        Parameters
-        ----------
-        data : pandas.DataFrame
-            The data frame containing the data.
-        variable_col : list of str
-            List of column names to be used as independent variables.
-        target_col : str
-            The name of the dependent variable column.
-        ties : {'auto', bool}, optional
-            How to handle ties in Xi correlation calculation:
-            - 'auto' (default): Decide based on the uniqueness of y values.
-            - True: Assume ties are present.
-            - False: Assume no ties are present.
+        Args:
+            data (pandas.DataFrame): The data frame containing the data.
+            variable_col (list of str): List of column names to be used as independent variables.
+            target_col (str): The name of the dependent variable column.
 
-        Returns
-        -------
-        pandas.DataFrame
-            DataFrame containing Xi correlations and p-values, sorted by the Xi correlation.
+        Returns:
+            pandas.DataFrame: DataFrame containing the Xi correlation between the target column and each variable.
         """
         scores = [
             CorrelationAnalyzer._xicordf(data, x, target_col, ties)
@@ -175,24 +153,17 @@ class CorrelationAnalyzer:
         """
         Calculate the Xi correlation for specified columns in a DataFrame.
 
-        Parameters
-        ----------
-        data : pandas.DataFrame
-            The data frame containing the data.
-        x_col : str
-            The name of the independent variable column.
-        y_col : str
-            The name of the dependent variable column.
-        ties : {'auto', bool}, optional
-            How to handle ties in the data:
-            - 'auto' (default): Decide based on the uniqueness of y values.
-            - True: Assume ties are present.
-            - False: Assume no ties are present.
+        Args:
+            data (pandas.DataFrame): The data frame containing the data.
+            x_col (str): The name of the independent variable column.
+            y_col (str): The name of the dependent variable column.
+            ties (str or bool, optional): How to handle ties in Xi correlation calculation:
+                - 'auto' (default): Decide based on the uniqueness of y values.
+                - True: Assume ties are present.
+                - False: Assume no ties are present.
 
-        Returns
-        -------
-        dict
-            A dictionary containing the Xi correlation statistic and p-value.
+        Returns:
+            dict: Dictionary containing the x, y, Xi correlation, and p-value.
         """
         x = data[x_col].values
         y = data[y_col].values
@@ -204,31 +175,20 @@ class CorrelationAnalyzer:
         """
         Calculate the Xi correlation coefficient and p-value between two arrays.
 
-        Parameters
-        ----------
-        x : array_like
-            The independent variable array.
-        y : array_like
-            The dependent variable array.
-        ties : {'auto', bool}, optional
-            How to handle ties in the data:
-            - 'auto' (default): Decide based on the uniqueness of y values.
-            - True: Assume ties are present.
-            - False: Assume no ties are present.
+        Args:
+            x (array-like): The first array.
+            y (array-like): The second array.
+            ties (str or bool, optional): How to handle ties in Xi correlation calculation:
+                - 'auto' (default): Decide based on the uniqueness of y values.
+                - True: Assume ties are present.
+                - False: Assume no ties are present.
 
-        Returns
-        -------
-        statistic : float
-            The Xi correlation coefficient.
-        p_value : float
-            The p-value for the Xi correlation.
+        Returns:
+            tuple: Tuple containing the Xi correlation coefficient and p-value.
 
-        Raises
-        ------
-        IndexError
-            If the lengths of x and y do not match.
-        ValueError
-            If the ties parameter is not 'auto' or a boolean.
+        Raises:
+            IndexError: If the lengths of x and y do not match.
+            ValueError: If the ties argument is not a boolean or
         """
         x = np.asarray(x).flatten()
         y = np.asarray(y).flatten()
