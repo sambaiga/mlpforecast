@@ -2,8 +2,8 @@
 
 <div align="center">
 
-[![Python](https://img.shields.io/pypi/pyversions/perceptron-forecaster)](https://pypi.org/project/mlpforecast/)
-[![PyPi](https://img.shields.io/pypi/v/perceptron-forecaster?color=blue)](https://pypi.org/project/mlpforecast/)
+[![Python](https://img.shields.io/pypi/pyversions/mlpforecast)](https://pypi.org/project/mlpforecast/)
+[![PyPi](https://img.shields.io/pypi/v/mlpforecast?color=blue)](https://pypi.org/project/mlpforecast/)
 [![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square)](#contributors-)
 
 </div>
