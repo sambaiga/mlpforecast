@@ -43,7 +43,7 @@ out=model.predict(test_data)
 ```
 ## Features
 - **Point Forecasting**: Generate accurate single-point predictions for your time series data, ensuring precise future estimates.
-  ![alt text](images/prediction.png)
+  ![alt text](https://raw.githubusercontent.com/sambaiga/mlpforecast/main/images/prediction.png?token=GHSAT0AAAAAACT6IGQ5ADF76NUOMUROAOKMZVH6FLQ)
 
 - **Low Model Complexity**: Benefit from a design focused on minimizing complexity while maintaining high performance and accuracy, making it easier to deploy and maintain.
 
