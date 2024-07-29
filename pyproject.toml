@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mlpforecast"
-version = "0.1.0"
+version = "0.1.1"
 description = "Multilayer Perceptron Learning Models for Time Series Forecasting"
 authors = ["sambaiga <sambaiga@gmail.com>",  "apina <fred.apina@gmail.com>"]
 readme = "README.md"
