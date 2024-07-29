@@ -73,7 +73,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
   <tbody>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/sambaiga"><img src="https://avatars.githubusercontent.com/u/338440?v=4?s=100" width="100px;" alt="Sambaiga"/><br /><sub><b>Anthony</b></sub></a><br /><a href="https://github.com/sambaiga/MLPF/commits?author=sambaiga" title="Code">💻</a> <a href="#maintenance-sambaiga" title="Maintenance">🚧</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/fred-apina"><img src="https://avatars.githubusercontent.com/u/39369908?v=4?s=100" width="100px;" alt="fred-apina"/><br /><sub><b>Apina</b></sub></a><br /><a href="https://github.com/sambaiga/MLPF/commits?author=fred-apina" title="Code">💻</a> <a href="#maintenance-fred-apina" title="Maintenance">🚧</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/fred-apina"><img src="https://avatars.githubusercontent.com/u/39369908?v=4?s=100" width="100px;" alt="fred-apina"/><br /><sub><b>Frederick</b></sub></a><br /><a href="https://github.com/sambaiga/MLPF/commits?author=fred-apina" title="Code">💻</a> <a href="#maintenance-fred-apina" title="Maintenance">🚧</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/fred-apina"><img src="https://avatars.githubusercontent.com/u/7491890?v=4?s=100" width="100px;" alt="alspereira"/><br /><sub><b>Lucas</b></sub></a><br /><a href="https://github.com/sambaiga/MLPF/commits?author=alspereira" title="Code">💻</a> <a href="#maintenance-alspereira" title="Maintenance">🚧</a></td>
     </tr>
   </tbody>
