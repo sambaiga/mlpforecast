@@ -65,7 +65,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contributors
 
-Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+Thanks goes to these wonderful people:
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
@@ -78,6 +78,8 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     </tr>
   </tbody>
 </table>
+
+
 
 ## References
 

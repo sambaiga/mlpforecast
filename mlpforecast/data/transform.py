@@ -15,6 +15,8 @@ from mlpforecast.data.processing import (
     get_n_sample_per_day,
 )
 
+def drop_na(data):
+    return data.dropna()
 
 class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
     """
@@ -136,7 +138,7 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             )
             steps.append(("rolling_step", transformer_rolling))
 
-        steps.append(("dropnan_step", FunctionTransformer(lambda x: x.dropna())))
+        steps.append(("dropnan_step", FunctionTransformer(drop_na)))
         return Pipeline(steps=steps)
 
     def _build_data_pipeline(self) -> ColumnTransformer:

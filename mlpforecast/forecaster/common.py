@@ -85,6 +85,7 @@ class PytorchForecast:
         self.rich_progress_bar = rich_progress_bar
         self.model_type = "default_model"  # Update with actual model type
         self.model = None
+        self.train_df=None
         self.datamodule = None
         self.gradient_clip_val = gradient_clip_val
         self._create_folder()
@@ -368,8 +369,10 @@ class PytorchForecast:
         Returns:
             pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
         """
-        if test_df is not None:
+        if (test_df is not None) and (self.train_df is not None):
             test_df = pd.concat([self.train_df, test_df], axis=0)
+        else:
+            assert ValueError("test_df can not be None")
         test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
 
         ground_truth = self.load_and_prepare_data(test_df, daily_feature)
