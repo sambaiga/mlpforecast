@@ -72,8 +72,9 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <table>
   <tbody>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/sambaiga"><img src="https://avatars.githubusercontent.com/u/338440?v=4?s=100" width="100px;" alt="Sambaiga"/><br /><sub><b>Sambaiga</b></sub></a><br /><a href="https://github.com/sambaiga/MLPF/commits?author=sambaiga" title="Code">💻</a> <a href="#maintenance-sambaiga" title="Maintenance">🚧</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/sambaiga"><img src="https://avatars.githubusercontent.com/u/338440?v=4?s=100" width="100px;" alt="Sambaiga"/><br /><sub><b>Anthony</b></sub></a><br /><a href="https://github.com/sambaiga/MLPF/commits?author=sambaiga" title="Code">💻</a> <a href="#maintenance-sambaiga" title="Maintenance">🚧</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/fred-apina"><img src="https://avatars.githubusercontent.com/u/39369908?v=4?s=100" width="100px;" alt="fred-apina"/><br /><sub><b>Apina</b></sub></a><br /><a href="https://github.com/sambaiga/MLPF/commits?author=fred-apina" title="Code">💻</a> <a href="#maintenance-fred-apina" title="Maintenance">🚧</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/fred-apina"><img src="https://avatars.githubusercontent.com/u/7491890?v=4?s=100" width="100px;" alt="alspereira"/><br /><sub><b>Lucas</b></sub></a><br /><a href="https://github.com/sambaiga/MLPF/commits?author=alspereira" title="Code">💻</a> <a href="#maintenance-alspereira" title="Maintenance">🚧</a></td>
     </tr>
   </tbody>
 </table>
@@ -82,6 +83,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 
 This work is inspired by the research from the following publication:
 
-A. Faustine, N. J. Nunes and L. Pereira, "Efficiency through Simplicity: MLP-based Approach for Net-Load Forecasting with Uncertainty Estimates in Low-Voltage Distribution Networks," in IEEE Transactions on Power Systems, doi: [10.1109/TPWRS.2024.3400123](https://ieeexplore-ieee-org.tudublin.idm.oclc.org/document/10529636).
+1. A. Faustine, N. J. Nunes and L. Pereira, "Efficiency through Simplicity: MLP-based Approach for Net-Load Forecasting with Uncertainty Estimates in Low-Voltage Distribution Networks," in IEEE Transactions on Power Systems, doi: [10.1109/TPWRS.2024.3400123](https://ieeexplore.ieee.org/document/10529636).
+2.  A. Faustine and L. Pereira, "FPSeq2Q: Fully Parameterized Sequence to Quantile Regression for Net-Load Forecasting With Uncertainty Estimates," in IEEE Transactions on Smart Grid, vol. 13, no. 3, pp. 2440-2451, May 2022, doi: [10.1109/TSG.2022.3148699](https://ieeexplore.ieee.org/document/9701598).
 
 <!-- markdownlint-restore -->
