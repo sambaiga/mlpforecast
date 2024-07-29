@@ -16,12 +16,17 @@ from mlpforecast.data.processing import (
 )
 
 
+def drop_na(data):
+    return data.dropna()
+
+
 class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
     """
     A class to handle dataset preprocessing for time series forecasting, including lag and rolling window feature
     augmentation, scaling, and feature extraction.
 
-    Attributes:
+    Attributes
+    ----------
         target_series (list): List of target series to forecast.
         unknown_features (list): List of unknown features.
         calender_variable (list): List of calendar variables.
@@ -75,10 +80,10 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             forecast_horizon (int): Forecast horizon (default is 48).
             date_column (str): Name of the date column (default is "timestamp").
 
-        Raises:
+        Raises
+        ------
             ValueError: If target_series is not a string or list of strings.
         """
-
         self.target_series = _validate_target_series(target_series)
         self.unknown_features = unknown_features
         self.calendar_variables = calendar_variables
@@ -102,9 +107,7 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
     def _build_pipeline(self) -> Pipeline:
         feature_pipeline = self._build_feature_pipeline()
         data_pipeline = self._build_data_pipeline()
-        return Pipeline(
-            steps=[("feature_extraction", feature_pipeline), ("scaling", data_pipeline)]
-        )
+        return Pipeline(steps=[("feature_extraction", feature_pipeline), ("scaling", data_pipeline)])
 
     def _build_feature_pipeline(self) -> Pipeline:
         steps = []
@@ -136,7 +139,7 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             )
             steps.append(("rolling_step", transformer_rolling))
 
-        steps.append(("dropnan_step", FunctionTransformer(lambda x: x.dropna())))
+        steps.append(("dropnan_step", FunctionTransformer(drop_na)))
         return Pipeline(steps=steps)
 
     def _build_data_pipeline(self) -> ColumnTransformer:
@@ -144,11 +147,13 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         if self.unknown_features or self.known_continuous_features:
             numerical_features = self.unknown_features + self.known_continuous_features
             numeric_transformer = Pipeline(steps=[("scaler", self.input_scaler)])
-            transformers.append((
-                "feat_scaler",
-                numeric_transformer,
-                numerical_features,
-            ))
+            transformers.append(
+                (
+                    "feat_scaler",
+                    numeric_transformer,
+                    numerical_features,
+                )
+            )
 
         target_transformer = Pipeline(steps=[("target_scaler", self.target_scaler)])
         transformers.append(("target_scaler", target_transformer, self.target_series))
@@ -169,9 +174,7 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         self.data_pipeline.fit(data)
         if self.calendar_variables:
             exog = data[self.calendar_variables].values
-            self.exog_periods = [
-                len(np.unique(exog[:, size])) for size in range(exog.shape[-1])
-            ]
+            self.exog_periods = [len(np.unique(exog[:, size])) for size in range(exog.shape[-1])]
         return self
 
     def transform(self, data):
@@ -195,35 +198,24 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
     def _add_fourier_features(self, data_transformed):
         exog = data_transformed[self.calendar_variables].astype(np.float32).values
         if self.exog_periods is None:
-            self.exog_periods = [
-                len(np.unique(exog[:, size])) for size in range(exog.shape[-1])
-            ]
-        seasonalities = np.hstack([
-            fourier_series_t(exog[:, i], self.exog_periods[i], 1)
-            for i in range(len(self.exog_periods))
-        ])
+            self.exog_periods = [len(np.unique(exog[:, size])) for size in range(exog.shape[-1])]
+        seasonalities = np.hstack(
+            [fourier_series_t(exog[:, i], self.exog_periods[i], 1) for i in range(len(self.exog_periods))]
+        )
         for i, col in enumerate(self.calendar_variables):
             data_transformed[f"{col}-sin"] = seasonalities[:, i]
-            data_transformed[f"{col}-cosin"] = (
-                seasonalities[:, i] + seasonalities[:, i + 1]
-            )
+            data_transformed[f"{col}-cosin"] = seasonalities[:, i] + seasonalities[:, i + 1]
             data_transformed[f"{col}-cos"] = seasonalities[:, i + 1]
             i += 2
 
     def _extract_features_and_targets(self, data_transformed):
-        features = data_transformed[
-            self.target_series + self.unknown_features
-        ].values.astype(np.float64)
+        features = data_transformed[self.target_series + self.unknown_features].values.astype(np.float64)
         targets = data_transformed[self.target_series].values.astype(np.float64)
         future_exogenous = data_transformed[
             self.known_continuous_features + self.known_calendar_features
         ].values.astype(np.float64)
-        features = np.concatenate([features, future_exogenous], axis=1).astype(
-            np.float64
-        )
-        assert (
-            len(features) > 0
-        ), "Ensure you have at least one historical feature to train the model."
+        features = np.concatenate([features, future_exogenous], axis=1).astype(np.float64)
+        assert len(features) > 0, "Ensure you have at least one historical feature to train the model."
 
         if not self.daily_features:
             features = extract_feature_sequences(

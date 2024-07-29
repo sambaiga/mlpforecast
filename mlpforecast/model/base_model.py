@@ -2,6 +2,7 @@ import logging
 
 import joblib
 import lightning as pl
+import torch
 import torchmetrics
 
 logging.basicConfig(level=logging.INFO)
@@ -53,3 +54,55 @@ class BaseForecastModel(pl.LightningModule):
 
     def on_load_checkpoint(self, checkpoint):
         self.data_pipeline = joblib.load(checkpoint["data_pipeline_path"])
+
+    def training_step(self, batch, batch_idx):
+        """
+        Perform a single training step.
+
+        Args:
+            batch (tuple): A batch of training data.
+            batch_idx (int): Index of the batch.
+
+        Returns
+        -------
+            tensor: The loss value for the batch.
+        """
+        loss, metric = self.model.step(batch, self.tra_metric_fcn)
+        self.log("train_loss", loss, prog_bar=True, logger=True)
+        self.log(f"train_{self.hparams['metric']}", metric, prog_bar=True, logger=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        """
+        Perform a single validation step.
+
+        Args:
+            batch (tuple): A batch of validation data.
+            batch_idx (int): Index of the batch.
+
+        Returns
+        -------
+            tensor: The loss value for the batch.
+        """
+        loss, metric = self.model.step(batch, self.val_metric_fcn)
+        self.log("val_loss", loss, prog_bar=True, logger=True)
+        self.log(f"val_{self.hparams['metric']}", metric, prog_bar=True, logger=True)
+
+    def configure_optimizers(self):
+        """
+        Configure optimizers and learning rate schedulers.
+
+        Returns
+        -------
+            tuple: A tuple containing the optimizer and the scheduler.
+        """
+        p1 = int(self.hparams["prob_decay_1"] * self.hparams["max_epochs"])
+        p2 = int(self.hparams["prob_decay_2"] * self.hparams["max_epochs"])
+
+        optimizer = torch.optim.Adam(
+            self.parameters(),
+            lr=self.hparams["learning_rate"],
+            weight_decay=self.hparams["weight_decay"],
+        )
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[p1, p2], gamma=self.hparams["gamma"])
+        return [optimizer], [scheduler]

@@ -129,7 +129,8 @@ class MLPForecastModel(BaseForecastModel):
         Args:
             x (tensor): Input data for forecasting.
 
-        Returns:
+        Returns
+        -------
             tensor: Forecasted values.
         """
         return self.model.forecast(x)
@@ -145,7 +146,8 @@ class MLPForecastModel(BaseForecastModel):
             batch (tuple): A batch of training data.
             batch_idx (int): Index of the batch.
 
-        Returns:
+        Returns
+        -------
             tensor: The loss value for the batch.
         """
         loss, metric = self.model.step(batch, self.tra_metric_fcn)
@@ -161,7 +163,8 @@ class MLPForecastModel(BaseForecastModel):
             batch (tuple): A batch of validation data.
             batch_idx (int): Index of the batch.
 
-        Returns:
+        Returns
+        -------
             tensor: The loss value for the batch.
         """
         loss, metric = self.model.step(batch, self.val_metric_fcn)
@@ -172,7 +175,8 @@ class MLPForecastModel(BaseForecastModel):
         """
         Configure optimizers and learning rate schedulers.
 
-        Returns:
+        Returns
+        -------
             tuple: A tuple containing the optimizer and the scheduler.
         """
         p1 = int(self.hparams["prob_decay_1"] * self.hparams["max_epochs"])
@@ -183,7 +187,5 @@ class MLPForecastModel(BaseForecastModel):
             lr=self.hparams["learning_rate"],
             weight_decay=self.hparams["weight_decay"],
         )
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer, milestones=[p1, p2], gamma=self.hparams["gamma"]
-        )
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[p1, p2], gamma=self.hparams["gamma"])
         return [optimizer], [scheduler]

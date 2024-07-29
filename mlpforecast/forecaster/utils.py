@@ -9,9 +9,7 @@ from mlpforecast.data.processing import (
 
 def format_target(targets, input_window_size, forecast_horizon, daily_feature=True):
     if daily_feature:
-        return extract_daily_sequences(
-            targets, input_window_size, forecast_horizon, target_mode=True
-        )
+        return extract_daily_sequences(targets, input_window_size, forecast_horizon, target_mode=True)
     else:
         return extract_target_sequences(targets, input_window_size, forecast_horizon)
 

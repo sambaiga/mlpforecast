@@ -56,17 +56,13 @@ class CorrelationAnalyzer:
             If an unsupported method is provided.
         """
         if method == "scatter":
-            return scatter_plot(
-                data, variable_col, target_col, hue_col, n_sample=n_sample
-            )
+            return scatter_plot(data, variable_col, target_col, hue_col, n_sample=n_sample)
         elif method in ["pearson", "kendall", "spearman"]:
             return CorrelationAnalyzer._get_correlation(data, variable_col, target_col)
         elif method == "ppscore":
             return CorrelationAnalyzer._get_ppscore(data, variable_col, target_col)
         elif method == "xicor":
-            return CorrelationAnalyzer._get_xicor_score(
-                data, variable_col, target_col, ties
-            )
+            return CorrelationAnalyzer._get_xicor_score(data, variable_col, target_col, ties)
         else:
             raise ValueError(
                 f"Unsupported method: {method}. Choose from 'pearson', 'kendall', 'spearman', 'ppscore', or 'xicor'."
@@ -96,12 +92,7 @@ class CorrelationAnalyzer:
             DataFrame containing the Pearson correlation between the target column and each variable.
         """
         non_zero_varlist = [target_col] + variable_col
-        correlations = (
-            data[non_zero_varlist]
-            .corr(method="pearson")
-            .unstack()
-            .sort_values(ascending=False)
-        )
+        correlations = data[non_zero_varlist].corr(method="pearson").unstack().sort_values(ascending=False)
         correlations = pd.DataFrame(correlations).reset_index()
         correlations.columns = ["col1", "col2", "correlation"]
         _corr = correlations.query(f"col1 == '{target_col}' & col2 != '{target_col}'")
@@ -155,16 +146,11 @@ class CorrelationAnalyzer:
         pandas.DataFrame
             DataFrame containing Xi correlations and p-values, sorted by the Xi correlation.
         """
-        scores = [
-            CorrelationAnalyzer._xicordf(data, x, target_col, ties)
-            for x in variable_col
-        ]
+        scores = [CorrelationAnalyzer._xicordf(data, x, target_col, ties) for x in variable_col]
         scores.sort(key=lambda item: item["xicor"], reverse=True)
 
         df_columns = ["x", "y", "xicor", "p-value"]
-        data_dict = {
-            column: [score[column] for score in scores] for column in df_columns
-        }
+        data_dict = {column: [score[column] for score in scores] for column in df_columns}
         scores_df = pd.DataFrame.from_dict(data_dict)
         scores_df = scores_df[["y", "x", "xicor"]]
         scores_df.columns = ["col1", "col2", "xicor"]
@@ -240,9 +226,7 @@ class CorrelationAnalyzer:
         if ties == "auto":
             ties = len(np.unique(y)) < n
         elif not isinstance(ties, bool):
-            raise ValueError(
-                f"Expected ties to be either 'auto' or boolean, got {ties} ({type(ties)}) instead"
-            )
+            raise ValueError(f"Expected ties to be either 'auto' or boolean, got {ties} ({type(ties)}) instead")
 
         y = y[np.argsort(x)]
         r = rankdata(y, method="ordinal")

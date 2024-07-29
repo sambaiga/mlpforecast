@@ -3,20 +3,18 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-import pandas as pd
 import optuna
 from optuna import Trial
 
 from mlpforecast.forecaster.common import PytorchForecast
 from mlpforecast.forecaster.utils import get_latest_checkpoint
-from mlpforecast.model.deterministic import MLPForecastModel
+from mlpforecast.model.parametric import MLPMultivarGaussModel
 from mlpforecast.net.layers import ACTIVATIONS
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("MLPF")
+logger = logging.getLogger("MLPFQR")
 
-
-class MLPForecast(PytorchForecast):
+class MLPMultivarGaussForecast(PytorchForecast):
     def __init__(
         self,
         hparams: dict,
@@ -62,7 +60,7 @@ class MLPForecast(PytorchForecast):
             rich_progress_bar=rich_progress_bar,
         )
         self.hparams = hparams
-        self.model = MLPForecastModel(**hparams)
+        self.model =  MLPMultivarGaussModel(**hparams)
 
     def load_checkpoint(self):
         """
@@ -71,7 +69,7 @@ class MLPForecast(PytorchForecast):
         This method retrieves the path of the latest checkpoint and loads the model from it.
         """
         path_best_model = get_latest_checkpoint(self.checkpoints)
-        self.model = MLPForecastModel.load_from_checkpoint(path_best_model)
+        self.model =  MLPMultivarGaussModel.load_from_checkpoint(path_best_model)
         self.model.eval()
 
     def get_search_params(self, trial: Trial) -> dict:
@@ -92,6 +90,7 @@ class MLPForecast(PytorchForecast):
         params["hidden_size"] = trial.suggest_int("hidden_size", 8, 512, step=2)
         params["num_layers"] = trial.suggest_int("num_layers", 1, 5)
         params["expansion_factor"] = trial.suggest_int("expansion_factor", 1, 4)
+        params["N"] = trial.suggest_int("N", 10, 100)
 
         # Define categorical hyperparameters
         params["embedding_type"] = trial.suggest_categorical(
@@ -104,7 +103,9 @@ class MLPForecast(PytorchForecast):
 
         # Define float hyperparameters
         params["dropout_rate"] = trial.suggest_float("dropout_rate", 0.0, 0.9, step=0.05)
-        params["alpha"] = trial.suggest_float("alpha", 1e-3, 1.0, log=True)
+        params["kappa"] = trial.suggest_float("kappa", 1e-3, 1, log=True)
+        params["eps"] = trial.suggest_float("eps", 1e-6, 1e-3, log=True)
+        params["alpha"] = trial.suggest_float("alpha", 1e-3, 1.0,log=True)
 
         return params
 
@@ -127,7 +128,7 @@ class MLPForecast(PytorchForecast):
             params = self.get_search_params(trial)
 
             self.hparams.update(params)
-            model = MLPForecast(
+            model =  MLPMultivarGaussModel(
                 self.hparams,
                 exp_name=f"{self.exp_name}",
                 seed=42,
@@ -159,55 +160,3 @@ class MLPForecast(PytorchForecast):
         )
         self.hparams.update(study.best_trial.params)
         np.save(f"{self.results_path}/best_params.npy", study.best_trial.params)
-
-    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
-        """
-        Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
-
-        Args:
-            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
-            daily_feature (bool): Flag indicating whether daily features are used in the model. Default is True.
-
-        Returns
-        -------
-            pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
-        """
-        if test_df is not None:
-            test_df = pd.concat([self.train_df, test_df], axis=0)
-        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
-
-        time_stamp, ground_truth = self.get_ground_truth(test_df=test_df, 
-                                                         daily_feature=daily_feature)
-
-        # Inverse transform predictions
-        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
-        target_scaler = scaler.named_transformers_["target_scaler"]
-
-        pred=self.perform_prediction(test_df=test_df)
-
-        N, T, C = pred["pred"].size()
-        pred["pred"] = target_scaler.inverse_transform(pred["pred"].numpy().reshape(N * T, C))
-        pred["pred"] = pred["pred"].reshape(N, T, C)
-
-        # Evaluate point forecast
-        self.metrics = self.evaluate_point_forecast(ground_truth, pred["pred"], time_stamp)
-        self.metrics["test-time"] = self.test_walltime
-        self.metrics["Model"] = self.model_type.upper()
-
-        # Assert that the prediction and ground truth shapes are the same
-        assert (
-            pred["pred"].shape == ground_truth.shape
-        ), "Shape mismatch: pred['pred'] and ground_truth must have the same shape."
-
-        # Create results DataFrame
-        results_df = self.create_results_df(
-            time_stamp,
-            ground_truth,
-            pred["pred"],
-            self.model.data_pipeline.target_series,
-            self.model.data_pipeline.date_column,
-        )
-        results_df["Model"] = self.model_type.upper()
-
-        return results_df
-

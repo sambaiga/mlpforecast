@@ -12,15 +12,18 @@ def sinusoids(length, channels, max_timescale=10000):
     """
     Returns sinusoids for positional embedding.
 
-    Parameters:
+    Parameters
+    ----------
     - length (int): Length of the sequence.
     - channels (int): Number of channels in the positional embeddings. It should be an even number.
     - max_timescale (int, optional): Maximum timescale for the sinusoids. Defaults to 10000.
 
-    Returns:
+    Returns
+    -------
     torch.Tensor: Sinusoidal positional embeddings.
     """
-    assert channels % 2 == 0
+    if channels % 2 != 0:
+        raise ValueError("Channels must be an even number.")
     log_timescale_increment = np.log(max_timescale) / (channels // 2 - 1)
     inv_timescales = torch.exp(-log_timescale_increment * torch.arange(channels // 2))
     scaled_time = torch.arange(length)[:, np.newaxis] * inv_timescales[np.newaxis, :]
@@ -31,23 +34,24 @@ def rotate_half(x):
     """
     Rotate the input tensor along the last dimension by half.
 
-    Parameters:
+    Parameters
+    ----------
     - x (torch.Tensor): Input tensor.
 
-    Returns:
+    Returns
+    -------
     torch.Tensor: Rotated tensor.
     """
     x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2 :]
-    return torch.cat(
-        (-x2, x1), dim=x1.ndim - 1
-    )  # dim=-1 triggers a bug in torch < 1.8.0
+    return torch.cat((-x2, x1), dim=x1.ndim - 1)  # dim=-1 triggers a bug in torch < 1.8.0
 
 
 class Rotary(torch.nn.Module):
     """
     Rotary positional embedding module.
 
-    Parameters:
+    Parameters
+    ----------
     - dim (int): Dimension of the input embeddings.
     - base (int, optional): Base value for frequency calculation. Defaults to 10000.
     """
@@ -64,11 +68,13 @@ class Rotary(torch.nn.Module):
         """
         Forward pass of the rotary positional embedding module.
 
-        Parameters:
+        Parameters
+        ----------
         - inputs (torch.Tensor): Input tensor.
         - seq_dim (int, optional): Dimension representing the sequence length. Defaults to 1.
 
-        Returns:
+        Returns
+        -------
         torch.Tensor: Rotary positional embeddings.
         """
         x = inputs.unsqueeze(2)
@@ -81,12 +87,8 @@ class Rotary(torch.nn.Module):
             self.cos_cached = emb.cos()[:, None, None, :]
             self.sin_cached = emb.sin()[:, None, None, :]
 
-        cos_half = self.cos_cached.squeeze(2).permute(1, 0, 2) * x.squeeze(2).mean(
-            -1
-        ).unsqueeze(2)
-        sin_half = self.sin_cached.squeeze(2).permute(1, 0, 2) * rotate_half(x).squeeze(
-            2
-        ).mean(-1).unsqueeze(2)
+        cos_half = self.cos_cached.squeeze(2).permute(1, 0, 2) * x.squeeze(2).mean(-1).unsqueeze(2)
+        sin_half = self.sin_cached.squeeze(2).permute(1, 0, 2) * rotate_half(x).squeeze(2).mean(-1).unsqueeze(2)
         return cos_half + sin_half
 
 
@@ -99,7 +101,8 @@ def Conv1DLayer(in_channels, out_channels, bias=True):
         out_channels (int): Number of output channels.
         bias (bool, optional): If True, adds a learnable bias to the output. Default is True.
 
-    Returns:
+    Returns
+    -------
         nn.Module: 1D convolutional layer.
 
     """
@@ -145,14 +148,13 @@ class PosEmbedding(nn.Module):
         Args:
             x (torch.Tensor): Input tensor.
 
-        Returns:
+        Returns
+        -------
             torch.Tensor: Output tensor after applying positional embedding.
 
         """
         # Apply convolutional embedding, ReLU activation, and scale by sqrt(d_model)
-        x = F.relu(self.emb(x.permute(0, 2, 1)).permute(0, 2, 1)) * math.sqrt(
-            self.d_model
-        )
+        x = F.relu(self.emb(x.permute(0, 2, 1)).permute(0, 2, 1)) * math.sqrt(self.d_model)
 
         # Add positional embedding
         x = (x + self.positional_embedding).to(x.dtype)
@@ -180,7 +182,8 @@ class RotaryEmbedding(nn.Module):
         Args:
             x (torch.Tensor): Input tensor.
 
-        Returns:
+        Returns
+        -------
             torch.Tensor: Output tensor after applying rotary embedding.
 
         """

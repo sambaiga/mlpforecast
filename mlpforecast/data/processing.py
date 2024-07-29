@@ -9,9 +9,7 @@ def _validate_target_series(target_series: list[str] | str) -> list[str]:
     """ """
     if isinstance(target_series, str):
         return [target_series]
-    if isinstance(target_series, list) and all(
-        isinstance(ts, str) for ts in target_series
-    ):
+    if isinstance(target_series, list) and all(isinstance(ts, str) for ts in target_series):
         return target_series
     raise ValueError(f"{target_series} should be a string or a list of strings.")
 
@@ -25,11 +23,13 @@ def detect_missing_date(dataset, period=30):
     """
     Fill missing dates in a time series dataset with NaN values.
 
-    Parameters:
+    Parameters
+    ----------
     - dataset (pd.DataFrame): The input time series dataset with a datetime index.
     - period (int): The frequency, in minutes, for the new date range. Default is 30 minutes.
 
-    Returns:
+    Returns
+    -------
     - pd.DataFrame: The input dataset with missing dates filled with NaN values.
     """
     data = dataset.copy()
@@ -159,9 +159,7 @@ def add_exogenous_variables(df, one_hot=False):
     data = df.copy().reset_index()
     data["DAYOFWEEK"] = data.timestamp.dt.dayofweek
     data["WEEK"] = (
-        data.timestamp.dt.isocalendar().week
-        if hasattr(data.timestamp.dt, "isocalendar")
-        else data.timestamp.dt.week
+        data.timestamp.dt.isocalendar().week if hasattr(data.timestamp.dt, "isocalendar") else data.timestamp.dt.week
     )
     data["DAYOFYEAR"] = data.timestamp.dt.dayofyear
     data["YEAR"] = data.timestamp.dt.year
@@ -208,13 +206,13 @@ def fourier_series(dates, period, series_order):
         dates (pd.Series): containing timestamps.
         period (float): Number of days of the period.
         series_order (int): Number of fourier components.
-    Returns:
+
+    Returns
+    -------
         Matrix with seasonality features.
     """
     # convert to days since epoch
-    t = np.array((dates - datetime(1970, 1, 1)).dt.total_seconds().astype(float)) / (
-        3600 * 24.0
-    )
+    t = np.array((dates - datetime(1970, 1, 1)).dt.total_seconds().astype(float)) / (3600 * 24.0)
     return fourier_series_t(t, period, series_order)
 
 
@@ -225,14 +223,14 @@ def fourier_series_t(t, period, series_order):
         t (pd.Series, float): containing time as floating point number of days.
         period (float): Number of days of the period.
         series_order (int): Number of fourier components.
-    Returns:
+
+    Returns
+    -------
         Matrix with seasonality features.
     """
-    features = np.column_stack([
-        fun(2.0 * (i + 1) * np.pi * t / period)
-        for i in range(series_order)
-        for fun in (np.sin, np.cos)
-    ])
+    features = np.column_stack(
+        [fun(2.0 * (i + 1) * np.pi * t / period) for i in range(series_order) for fun in (np.sin, np.cos)]
+    )
     return features
 
 
@@ -252,13 +250,7 @@ def get_index(test_df, hparams, test=True):
 
     for i in list_range:
         past_index.append(index[i : i + hparams["window_size"]])
-        future_index.append(
-            index[
-                i + hparams["window_size"] : i
-                + hparams["window_size"]
-                + hparams["horizon"]
-            ]
-        )
+        future_index.append(index[i + hparams["window_size"] : i + hparams["window_size"] + hparams["horizon"]])
     index = np.concatenate((np.array(past_index), np.array(future_index)), 1)
 
     return index
@@ -284,7 +276,8 @@ def combine_past_future_exogenous(features: np.array, covariates: np.array = Non
     """
     Combines past and future exogenous features with optional covariates.
 
-    Parameters:
+    Parameters
+    ----------
     - features (np.array): A 2D or 3D numpy array of features. If 2D, it is reshaped to 3D.
                           Expected shape (N, C) for 2D or (B, N, C) for 3D, where:
                           - B is the batch size.
@@ -293,18 +286,19 @@ def combine_past_future_exogenous(features: np.array, covariates: np.array = Non
     - covariates (np.array, optional): A 2D or 3D numpy array of covariates. If 2D, it is reshaped to 3D.
                                        Expected shape (N, C) for 2D or (B, N, C) for 3D. Default is None.
 
-    Returns:
+    Returns
+    -------
     - np.array: A 3D numpy array with combined features and covariates along the second axis. The shape
                 of the returned array is (B, 2N, C), where:
                 - B is the batch size.
                 - 2N is the combined number of time steps.
                 - C is the number of features, padded with zeros if covariates had fewer features than features.
 
-    Raises:
+    Raises
+    ------
     - AssertionError: If `features` or `covariates` do not have 2 or 3 dimensions.
     - AssertionError: If `features` and `covariates` do not have the same batch size and time steps after reshaping.
     """
-
     assert features.ndim in (2, 3), "Features must be a 2D or 3D array."
     if features.ndim == 2:
         N, C = features.shape
@@ -333,12 +327,14 @@ def extract_target_sequences(targets, input_window_size, forecast_horizon):
     """
     Extract sequences of target data for forecasting.
 
-    Parameters:
+    Parameters
+    ----------
     targets (np.ndarray): The target data array of shape (n_samples, n_features).
     input_window_size (int): The size of the input window.
     forecast_horizon (int): The forecast horizon.
 
-    Returns:
+    Returns
+    -------
     np.ndarray: The extracted target sequences of shape (n_sequences, forecast_horizon, n_features).
     """
     targets = np.squeeze(
@@ -355,12 +351,14 @@ def extract_feature_sequences(features, input_window_size, forecast_horizon):
     """
     Extract sequences of feature data for forecasting.
 
-    Parameters:
+    Parameters
+    ----------
     features (np.ndarray): The feature data array of shape (n_samples, n_features).
     input_window_size (int): The size of the input window.
     forecast_horizon (int): The forecast horizon.
 
-    Returns:
+    Returns
+    -------
     np.ndarray: The extracted feature sequences of shape (n_sequences, input_window_size, n_features).
     """
     features = np.squeeze(
@@ -370,51 +368,45 @@ def extract_feature_sequences(features, input_window_size, forecast_horizon):
         ),
         axis=1,
     )
-    features = features.reshape(features.shape[0], input_window_size, -1)[
-        :-forecast_horizon
-    ]
+    features = features.reshape(features.shape[0], input_window_size, -1)[:-forecast_horizon]
     return features
 
 
-def extract_daily_sequences(
-    data, input_window_size, forecast_horizon, target_mode=False
-):
+def extract_daily_sequences(data, input_window_size, forecast_horizon, target_mode=False):
     """
     Extract daily sequences of feature or target data for forecasting.
 
-    Parameters:
+    Parameters
+    ----------
     data (np.ndarray): The data array of shape (n_samples, n_features).
     input_window_size (int): The size of the input window.
     forecast_horizon (int): The forecast horizon.
     target_mode (bool): Whether to extract target sequences instead of feature sequences.
 
-    Returns:
+    Returns
+    -------
     np.ndarray: The extracted sequences of shape (n_sequences, window_size, n_features).
     """
     nb_obs, nb_features = data.shape
-    list_range = range(
-        0, nb_obs - input_window_size - forecast_horizon + 1, forecast_horizon
-    )
+    list_range = range(0, nb_obs - input_window_size - forecast_horizon + 1, forecast_horizon)
     num_sequences = len(list_range)
 
     # Preallocate an array for the results
-    sequences_array = np.empty((
-        num_sequences,
-        forecast_horizon if target_mode else input_window_size,
-        nb_features,
-    ))
+    sequences_array = np.empty(
+        (
+            num_sequences,
+            forecast_horizon if target_mode else input_window_size,
+            nb_features,
+        )
+    )
 
     for idx, i in enumerate(tqdm(list_range, desc="Processing sequences")):
         if target_mode:
             sequences_array[idx] = np.expand_dims(
-                data[
-                    i + input_window_size : i + input_window_size + forecast_horizon, :
-                ],
+                data[i + input_window_size : i + input_window_size + forecast_horizon, :],
                 axis=0,
             )
         else:
-            sequences_array[idx] = np.expand_dims(
-                data[i : i + input_window_size, :], axis=0
-            )
+            sequences_array[idx] = np.expand_dims(data[i : i + input_window_size, :], axis=0)
 
     return sequences_array
