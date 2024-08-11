@@ -53,7 +53,16 @@ def get_periods_for_exog_variable(hparams, data):
 
 
 def add_time_features(results_pd, hemisphere="Northern"):
-    results_pd = results_pd.reset_index()
+    '''
+    you need to add column name of index as timestamp otherwise function fails
+    Args:
+        results_pd:
+        hemisphere:
+
+    Returns:
+
+    '''
+    results_pd.reset_index(names='timestamp', inplace=True) #added by shridhar
     results_pd["quarter"] = results_pd.timestamp.dt.quarter.values
     results_pd["day"] = results_pd.timestamp.dt.day_name().values
     results_pd["hour"] = results_pd.timestamp.dt.hour.values

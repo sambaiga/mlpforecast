@@ -1,5 +1,5 @@
 import pytest
-from mlpforecast.data.processing import _validate_target_series,get_n_sample_per_day, detect_missing_date
+from mlpforecast.data.processing import _validate_target_series,get_n_sample_per_day, detect_missing_date,add_time_features
 import pandas as pd
 import numpy as np
 def test_validate_target_series_with_string():
@@ -78,3 +78,12 @@ def test_detect_missing_date_with_missing_dates(mocker, sample_dataset):
     }, index=expected_index)
 
     pd.testing.assert_frame_equal(result, expected_result)
+
+def test_add_time_features(sample_dataset):
+    result = add_time_features(sample_dataset)
+    expected_columns = ['quarter', 'day', 'hour', 'week', 'month', 'year', 'Session', 'Season']
+    for column in expected_columns:
+        assert column in result.columns, f"Column {column} should be present in the DataFrame"
+        # Check that there are no null values in the created columns
+    for column in expected_columns:
+        assert result[column].isnull().sum() == 0, f"Column {column} should not contain any null values"
