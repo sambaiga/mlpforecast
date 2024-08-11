@@ -32,10 +32,14 @@ def detect_missing_date(dataset, period=30):
     Returns:
     - pd.DataFrame: The input dataset with missing dates filled with NaN values.
     """
+    """
+    Unit test failing due to dt_rng = pd.date_range(min_dt, max_dt, freq=f"{period}T")
+    creating extra row
+    """
     data = dataset.copy()
     index_name = data.index.name
     min_dt = min([data.index.min()])
-    max_dt = max([data.index.max()]) + pd.Timedelta(minutes=period)
+    max_dt = max([data.index.max()]) #+ pd.Timedelta(minutes=period)
     dt_rng = pd.date_range(min_dt, max_dt, freq=f"{period}T")
     data = data.reindex(dt_rng)
     data.index.name = index_name
