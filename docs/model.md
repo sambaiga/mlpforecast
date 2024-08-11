@@ -3,4 +3,6 @@ an **information-oriented** approach. Use it as a
 reference for the technical implementation of the
 `mlpForecaster` project code.
 
-::: plot.visual_functions
+::: mlpforecast.model.deterministic
+
+::: mlpforecast.model.base_model

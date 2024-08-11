@@ -2,9 +2,18 @@
 
 <div align="center">
 
-[![Python](https://img.shields.io/pypi/pyversions/mlpforecast)](https://pypi.org/project/mlpforecast/)
+<!-- [![Python](https://img.shields.io/pypi/pyversions/mlpforecast)](https://pypi.org/project/mlpforecast/)
 [![PyPi](https://img.shields.io/pypi/v/mlpforecast?color=blue)](https://pypi.org/project/mlpforecast/)
-[![All Contributors](https://img.shields.io/badge/all_contributors-3-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-3-orange.svg?style=flat-square)](#contributors-) -->
+<a href="https://pypi.org/project/mlpforecast" target="_blank">
+    <img src="https://img.shields.io/pypi/pyversions/mlpforecast" alt="Python version">
+</a>
+<a href="https://pypi.org/project/mlpforecast" target="_blank">
+    <img src="https://img.shields.io/pypi/v/typer?color=%2334D058&label=pypi%20package" alt="Package version">
+</a>
+<a href="#contributors-" target="_blank">
+    <img src="https://img.shields.io/badge/all_contributors-3-orange.svg?style=flat-square" alt="All Contributors">
+</a>
 
 </div>
 
