@@ -63,8 +63,7 @@ class MLPForecastModel(BaseForecastModel):
             hidden_size (int, optional): Dimensionality of the hidden layers. Defaults to 64.
             num_layers (int, optional): Number of layers in the MLP. Defaults to 2.
             expansion_factor (int, optional): Factor to expand the size of layers. Defaults to 2.
-            residual (bool, optional):\
-              Whether to use residual connections. Defaults to False.
+            residual (bool, optional): Whether to use residual connections. Defaults to False.
             activation_function (str, optional): \
                   Activation function to use in the hidden layers. Defaults to "ReLU".
             out_activation_function (str, optional): Activation function to use in the output layer. \
@@ -141,7 +140,7 @@ class MLPForecastModel(BaseForecastModel):
             x (tensor): Input data for forecasting.
 
         Returns:
-            tensor: Forecasted values.
+            (tensor): Forecasted values.
         """
         return self.model.forecast(x)
 
@@ -165,7 +164,7 @@ class MLPForecastModel(BaseForecastModel):
             batch_idx (int): Index of the batch.
 
         Returns:
-            tensor: The loss value for the batch.
+            (tensor): The loss value for the batch.
         """
         loss, metric = self.model.step(batch, self.tra_metric_fcn)
         self.log("train_loss", loss, prog_bar=True, logger=True)
@@ -182,7 +181,7 @@ class MLPForecastModel(BaseForecastModel):
             batch_idx (int): Index of the batch.
 
         Returns:
-            tensor: The loss value for the batch.
+            (tensor): The loss value for the batch.
         """
         loss, metric = self.model.step(batch, self.val_metric_fcn)
         self.log("val_loss", loss, prog_bar=True, logger=True)
@@ -194,7 +193,7 @@ class MLPForecastModel(BaseForecastModel):
         Configure optimizers and learning rate schedulers.
 
         Returns:
-            tuple: A tuple containing the optimizer and the scheduler.
+            (tuple): A tuple containing the optimizer and the scheduler.
         """
         p1 = int(self.hparams["prob_decay_1"] * self.hparams["max_epochs"])
         p2 = int(self.hparams["prob_decay_2"] * self.hparams["max_epochs"])

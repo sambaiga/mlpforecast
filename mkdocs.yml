@@ -1,4 +1,6 @@
 site_name: MLPForecast Docs
+site_description: "MLPF framework Documentation"
+site_url: "https://sambaiga.github.io/mlpforecast"
 repo_name: sambaiga/mlpforecast
 repo_url: https://github.com/sambaiga/mlpforecast
 
@@ -8,8 +10,8 @@ theme:
   # highlightjs: true
   features:
   - announce.dismiss
-  - content.action.edit
-  - content.action.view
+  # - content.action.edit
+  # - content.action.view
   - content.code.annotate
   - content.code.copy
   - content.tooltips
@@ -73,10 +75,10 @@ plugins:
             parameter_headings: true
             preload_modules: [mkdocstrings]
             separate_signature: true
-            show_root_heading: true
+            show_root_heading: false
             show_root_full_path: false
             show_signature_annotations: true
-            show_source: false
+            show_source: true
             show_symbol_type_heading: true
             show_symbol_type_toc: true
             signature_crossrefs: true
@@ -125,4 +127,4 @@ markdown_extensions:
 - pymdownx.tasklist:
     custom_checkbox: true
 - toc:
-    permalink: "¤"
+    # permalink: "¤"

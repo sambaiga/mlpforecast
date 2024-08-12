@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/pypi/pyversions/mlpforecast" alt="Python version">
 </a>
 <a href="https://pypi.org/project/mlpforecast" target="_blank">
-    <img src="https://img.shields.io/pypi/v/typer?color=%2334D058&label=pypi%20package" alt="Package version">
+    <img src="https://img.shields.io/pypi/v/mlpforecast?color=%2334D058&label=pypi%20package" alt="Package version">
 </a>
 <a href="#contributors-" target="_blank">
     <img src="https://img.shields.io/badge/all_contributors-3-orange.svg?style=flat-square" alt="All Contributors">

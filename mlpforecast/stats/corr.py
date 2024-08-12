@@ -43,7 +43,7 @@ class CorrelationAnalyzer:
             n_sample (int, optional): The number of samples to use for the scatter
 
         Returns:
-            pandas.DataFrame: DataFrame containing the correlation between the target column and each variable.
+            (pandas.DataFrame): DataFrame containing the correlation between the target column and each variable.
 
         Raises:
             ValueError: If the method is not supported.

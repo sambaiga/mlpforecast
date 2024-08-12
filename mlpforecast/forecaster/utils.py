@@ -18,7 +18,7 @@ def format_target(targets, input_window_size, forecast_horizon, daily_feature=Tr
         daily_feature (bool, optional): Whether to use daily features. Defaults to True.
 
     Returns:
-        np.ndarray: Formatted target data.
+        (np.ndarray): Formatted target data.
     """
     if daily_feature:
         return extract_daily_sequences(
@@ -36,7 +36,7 @@ def get_latest_checkpoint(checkpoint_path):
         checkpoint_path (str): Path to the directory containing the checkpoint files.
 
     Returns:
-        str: Path of the latest checkpoint file.
+        latest_file (str): Path of the latest checkpoint file.
     """
     checkpoint_path = str(checkpoint_path)
     list_of_files = glob.glob(checkpoint_path + "/*.ckpt")

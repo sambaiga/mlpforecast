@@ -18,7 +18,7 @@ def sinusoids(length, channels, max_timescale=10000):
         max_timescale (int, optional): Maximum timescale for the sinusoids. Defaults to 10000.
 
     Returns:
-        torch.Tensor: Sinusoidal positional embeddings.
+        (torch.Tensor): Sinusoidal positional embeddings.
     """
     assert channels % 2 == 0
     log_timescale_increment = np.log(max_timescale) / (channels // 2 - 1)
@@ -35,7 +35,7 @@ def rotate_half(x):
         x (torch.Tensor): Input tensor.
 
     Returns:
-        torch.Tensor: Rotated tensor.
+        (torch.Tensor): Rotated tensor.
     """
     x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2 :]
     return torch.cat(
@@ -77,7 +77,7 @@ class Rotary(torch.nn.Module):
             seq_dim (int, optional): Dimension representing the sequence length. Defaults to 1.
 
         Returns:
-            torch.Tensor: Rotary positional embeddings.
+            (torch.Tensor): Rotary positional embeddings.
         """
         x = inputs.unsqueeze(2)
         seq_len = x.shape[seq_dim]
@@ -108,7 +108,7 @@ def Conv1DLayer(in_channels, out_channels, bias=True):
         bias (bool, optional): If True, adds a learnable bias to the output. Default is True.
 
     Returns:
-        nn.Module: 1D convolutional layer.
+        (nn.Module): 1D convolutional layer.
     """
     # Create a 1D convolutional layer with specified parameters
     m = nn.Conv1d(in_channels, out_channels, kernel_size=3, padding=1, bias=bias)
@@ -159,7 +159,7 @@ class PosEmbedding(nn.Module):
             x (torch.Tensor): Input tensor.
 
         Returns:
-            torch.Tensor: Output tensor after applying positional embedding.
+            (torch.Tensor): Output tensor after applying positional embedding.
         """
         # Apply convolutional embedding, ReLU activation, and scale by sqrt(d_model)
         x = F.relu(self.emb(x.permute(0, 2, 1)).permute(0, 2, 1)) * math.sqrt(
@@ -199,7 +199,7 @@ class RotaryEmbedding(nn.Module):
             x (torch.Tensor): Input tensor.
 
         Returns:
-            torch.Tensor: Output tensor after applying rotary embedding.
+            (torch.Tensor): Output tensor after applying rotary embedding.
         """
         x = self.emb(x)
         return x

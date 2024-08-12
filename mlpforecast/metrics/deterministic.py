@@ -23,7 +23,7 @@ def get_nbias(y, y_hat, axis=0):
         axis (int, optional): The axis along which to compute the NBias. Default is 0.
 
     Returns:
-        float: The normalized bias value.
+        (float): The normalized bias value.
     """
     epsilon = np.finfo(np.float64).eps  # Small value to avoid division by zero
     scale = y + y_hat  # Sum of true and predicted values
@@ -48,7 +48,7 @@ def get_smape(y, y_hat, axis=0):
               The axis along which to compute the SMAPE. Default is 0.
 
     Returns:
-        float: The symmetric mean absolute percentage error value.
+        (float): The symmetric mean absolute percentage error value.
     """
     epsilon = np.finfo(np.float64).eps
     # Small value to avoid division by zero
@@ -61,12 +61,16 @@ def get_smape(y, y_hat, axis=0):
 
 
 def get_pointwise_metrics(pred: np.array, true: np.array, target_range: float = None):
-    """calculate pointwise metrics
-    Args:   pred: predicted values
-            true: true values
-            target_range: target range
-    Returns:    rmse: root mean square error
+    """
+    Calculate pointwise metrics
 
+    Args:
+        pred (np.array): predicted values
+        true (np.array): true values
+        target_range (float): range of the target variable
+
+    Returns:
+        (dict): pointwise metrics
 
     """
     assert pred.ndim == 1, "pred must be 1-dimensional"
@@ -124,10 +128,9 @@ def evaluate_point_forecast(outputs):
                 'loc' (ndarray): The predicted values.
                 'index' (ndarray): The timestamps for each prediction.
                 'targets' (list): The names of the target variables.
-        show_fig (bool, optional): Whether to display a figure of the results. Default is False.
 
     Returns:
-        tuple: A tuple containing:
+        (tuple): A tuple containing:
             - pd_metrics (dict): DataFrame of combined metrics for each target variable.
             - split_metrics (dict): Dictionary of metrics split by target variable.
             - logs (dict): Any additional logs generated during the evaluation.

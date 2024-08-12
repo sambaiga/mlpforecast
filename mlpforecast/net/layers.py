@@ -31,7 +31,7 @@ def create_linear(in_channels, out_channels, bn=False):
         bn (bool, optional): If True, adds batch normalization. Defaults to False.
 
     Returns:
-        nn.Module: Linear layer with optional batch normalization.
+        (nn.Module): Linear layer with optional batch normalization.
     """
     # Create a linear layer
     m = nn.Linear(in_channels, out_channels)
@@ -66,7 +66,7 @@ def FeedForward(dim, expansion_factor=2, dropout=0.0, activation=nn.GELU(), bn=T
         bn (bool, optional): If True, adds batch normalization. Defaults to True.
 
     Returns:
-        nn.Sequential: Feedforward block.
+        (nn.Sequential): Feedforward block.
     """
     # Create a sequential block with linear layer, activation, and dropout
     block = nn.Sequential(
@@ -158,7 +158,7 @@ class MLPBlock(nn.Module):
             x (torch.Tensor): Input tensor.
 
         Returns:
-            torch.Tensor: Output tensor after passing through the MLP block.
+            (torch.Tensor): Output tensor after passing through the MLP block.
         """
         # Flatten the input along dimensions 1 and 2
         if x.ndim == 3:

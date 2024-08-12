@@ -35,7 +35,7 @@ def plot_prediction(ax, true, mu, date=None, true_max=None):
             The maximum value of the true values for scaling. If None, it is computed from `true`.
 
     Returns:
-        tuple: A tuple containing the modified axes, the list of line objects, and the list of labels.
+        ax (matplotlib.axes.Axes): The axes with the plot.
     """
     # Set default date range if not provided
     date = np.arange(len(true)) if date is None else date
@@ -81,7 +81,7 @@ def plot_correlation(ax, corr_df, cmap=sns.diverging_palette(240, 10, as_cmap=Tr
             Colormap to use for the heatmap. Default is a diverging palette from Seaborn.
 
     Returns:
-        matplotlib.axes.Axes: The Axes object with the heatmap.
+        ax (matplotlib.axes.Axes): The Axes object with the heatmap.
     """
     columns = list(corr_df.columns)
     corr = corr_df.pivot(index=columns[1], columns=columns[0], values=columns[-1])
@@ -109,7 +109,7 @@ def scatter_plot(
         random_state (int, optional): Seed for random sampling. Default is 111.
 
     Returns:
-        alt.Chart: The Altair chart object with the scatter plot matrix.
+        chart (alt.Chart): The Altair chart object with the scatter plot matrix.
     """
     data = (
         data.sample(n=n_sample, random_state=random_state)
@@ -151,10 +151,9 @@ def visualise_timeseries_altair(data, y_col, figure_path=None, y_label="Power (k
         y_col (list of str): List of column names to plot on the y-axis.
         figure_path (str, optional): Path to save the figure. If None, the figure is not saved. Default is None.
         y_label (str, optional): Label for the y-axis. Default is 'Power (kW)'.
-        colors (list of str, optional): List of colors for the lines. Default is ['blue', 'red', 'green', 'purple'].
 
     Returns:
-        alt.Chart: The Altair chart object with the time series plot.
+        chart (alt.Chart): The Altair chart object with the time series plot.
     """
     chart = (
         alt.Chart(data.reset_index())
@@ -199,7 +198,7 @@ def plot_kde_(ax, data, x_col, hue_col, label):
         label (str): The label for the x-axis.
 
     Returns:
-        matplotlib.axes.Axes: The axes with the plot.
+        ax (matplotlib.axes.Axes): The axes with the plot.
     """
     sns.histplot(data, x=x_col, ax=ax, hue=hue_col, palette="tab20", kde=True)
     ax.autoscale()
@@ -219,7 +218,7 @@ def plot_cdf_(ax, data, x_col, hue_col, label):
         label (str): The label for the x-axis.
 
     Returns:
-        matplotlib.axes.Axes: The axes with the plot.
+        ax (matplotlib.axes.Axes): The axes with the plot.
     """
     sns.kdeplot(
         data,
@@ -255,7 +254,7 @@ def plot_distribution(ax, df, index_col="HOUR", val_col="WindSpeed", hue_col=Non
         hue_col (str, optional): The column in `df` to use for color grouping.
 
     Returns:
-        matplotlib.axes.Axes: The axes with the plot.
+        ax (matplotlib.axes.Axes): The axes with the plot.
     """
     # Calculate mean values for the pivot table
     mean_values = pd.pivot_table(
