@@ -192,8 +192,9 @@ class PytorchForecast:
             gradient_clip_val=self.gradient_clip_val,
             max_epochs=self.max_epochs,
             callbacks=callback,
-            accelerator="auto",
-            devices=1,
+            accelerator="cpu",
+            #accelerator="auto",
+            #devices=1,
         )
 
     def fit(

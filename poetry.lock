@@ -196,6 +196,21 @@ scipy = "*"
 stochastic = "*"
 
 [[package]]
+name = "aquarel"
+version = "0.0.6"
+description = "Lightweight templating engine for matplotlib"
+optional = false
+python-versions = ">3.7"
+files = [
+    {file = "aquarel-0.0.6-py3-none-any.whl", hash = "sha256:373fa3f9e101c16a8b453e2cb64c88ef05ab8830e873bb110bca49e14137877d"},
+    {file = "aquarel-0.0.6.tar.gz", hash = "sha256:1905766db15f07c3b4047fd19bc898e0193c93d14700cc549d0af83e8ada0dfa"},
+]
+
+[package.dependencies]
+cycler = "*"
+matplotlib = ">=3.4.0"
+
+[[package]]
 name = "arch"
 version = "7.0.0"
 description = "ARCH for Python"
@@ -4637,4 +4652,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "335de5e71ac7af1178fa8f18b37d244e20901a5dab288a76a333a33ee7e68ffd"
+content-hash = "0d55aa266618c329b2c625b82416fc32d5ad8a5292834c24e3c73a5803726985"
