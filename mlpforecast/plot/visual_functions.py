@@ -34,9 +34,8 @@ def plot_prediction(ax, true, mu, date=None, true_max=None):
         true_max (float, optional): \
             The maximum value of the true values for scaling. If None, it is computed from `true`.
 
-    Returns
-    -------
-        tuple: A tuple containing the modified axes, the list of line objects, and the list of labels.
+    Returns:
+        ax (matplotlib.axes.Axes): The axes with the plot.
     """
     # Set default date range if not provided
     date = np.arange(len(true)) if date is None else date
@@ -73,8 +72,7 @@ def plot_correlation(ax, corr_df, cmap=sns.diverging_palette(240, 10, as_cmap=Tr
     """
     Plots a heatmap of the correlation matrix.
 
-    Parameters
-    ----------
+    Args:
         ax (matplotlib.axes.Axes): The axes on which to plot the heatmap.
         corr_df (pandas.DataFrame): \
             DataFrame containing the correlation data with three columns: \
@@ -82,9 +80,8 @@ def plot_correlation(ax, corr_df, cmap=sns.diverging_palette(240, 10, as_cmap=Tr
         cmap (matplotlib.colors.Colormap, optional): \
             Colormap to use for the heatmap. Default is a diverging palette from Seaborn.
 
-    Returns
-    -------
-        matplotlib.axes.Axes: The Axes object with the heatmap.
+    Returns:
+        ax (matplotlib.axes.Axes): The Axes object with the heatmap.
     """
     columns = list(corr_df.columns)
     corr = corr_df.pivot(index=columns[1], columns=columns[0], values=columns[-1])
@@ -101,8 +98,7 @@ def scatter_plot(data, variables, targets, hue_col=None, n_sample=1000, random_s
     """
     Creates a scatter plot matrix using Altair.
 
-    Parameters
-    ----------
+    Args:
         data (pandas.DataFrame): The data to plot.
         variables (list of str): List of column names to be used as variables for the x-axis.
         targets (list of str): List of column names to be used as targets for the y-axis.
@@ -110,9 +106,8 @@ def scatter_plot(data, variables, targets, hue_col=None, n_sample=1000, random_s
         n_sample (int, optional): Number of samples to draw from the data for plotting. Default is 1000.
         random_state (int, optional): Seed for random sampling. Default is 111.
 
-    Returns
-    -------
-        alt.Chart: The Altair chart object with the scatter plot matrix.
+    Returns:
+        chart (alt.Chart): The Altair chart object with the scatter plot matrix.
     """
     data = data.sample(n=n_sample, random_state=random_state) if n_sample is not None else data
     chart = alt.Chart(data)
@@ -141,17 +136,14 @@ def visualise_timeseries_altair(data, y_col, figure_path=None, y_label="Power (k
     """
     Visualizes time series data using Altair.
 
-    Parameters
-    ----------
-    data (pandas.DataFrame): The data to plot, with a datetime index and the columns to be plotted.
-    y_col (list of str): List of column names to plot on the y-axis.
-    figure_path (str, optional): Path to save the figure. If None, the figure is not saved. Default is None.
-    y_label (str, optional): Label for the y-axis. Default is 'Power (kW)'.
-    colors (list of str, optional): List of colors for the lines. Default is ['blue', 'red', 'green', 'purple'].
+    Args:
+        data (pandas.DataFrame): The data to plot, with a datetime index and the columns to be plotted.
+        y_col (list of str): List of column names to plot on the y-axis.
+        figure_path (str, optional): Path to save the figure. If None, the figure is not saved. Default is None.
+        y_label (str, optional): Label for the y-axis. Default is 'Power (kW)'.
 
-    Returns
-    -------
-    alt.Chart: The Altair chart object with the time series plot.
+    Returns:
+        chart (alt.Chart): The Altair chart object with the time series plot.
     """
     chart = (
         alt.Chart(data.reset_index())
@@ -186,17 +178,15 @@ def plot_kde_(ax, data, x_col, hue_col, label):
     """
     Plot a Kernel Density Estimate (KDE) and histogram on the given axes.
 
-    Parameters
-    ----------
-    ax (matplotlib.axes.Axes): The axes on which to plot.
-    data (DataFrame): The data to plot.
-    x_col (str): The column in `data` to plot on the x-axis.
-    hue_col (str): The column in `data` to use for color grouping.
-    label (str): The label for the x-axis.
+    Args:
+        ax (matplotlib.axes.Axes): The axes on which to plot.
+        data (DataFrame): The data to plot.
+        x_col (str): The column in `data` to plot on the x-axis.
+        hue_col (str): The column in `data` to use for color grouping.
+        label (str): The label for the x-axis.
 
-    Returns
-    -------
-    matplotlib.axes.Axes: The axes with the plot.
+    Returns:
+        ax (matplotlib.axes.Axes): The axes with the plot.
     """
     sns.histplot(data, x=x_col, ax=ax, hue=hue_col, palette="tab20", kde=True)
     ax.autoscale()
@@ -208,17 +198,15 @@ def plot_cdf_(ax, data, x_col, hue_col, label):
     """
     Plot a Cumulative Distribution Function (CDF) on the given axes.
 
-    Parameters
-    ----------
-    ax (matplotlib.axes.Axes): The axes on which to plot.
-    data (DataFrame): The data to plot.
-    x_col (str): The column in `data` to plot on the x-axis.
-    hue_col (str): The column in `data` to use for color grouping.
-    label (str): The label for the x-axis.
+    Args:
+        ax (matplotlib.axes.Axes): The axes on which to plot.
+        data (DataFrame): The data to plot.
+        x_col (str): The column in `data` to plot on the x-axis.
+        hue_col (str): The column in `data` to use for color grouping.
+        label (str): The label for the x-axis.
 
-    Returns
-    -------
-    matplotlib.axes.Axes: The axes with the plot.
+    Returns:
+        ax (matplotlib.axes.Axes): The axes with the plot.
     """
     sns.kdeplot(
         data,
@@ -240,23 +228,21 @@ def plot_distribution(ax, df, index_col="HOUR", val_col="WindSpeed", hue_col=Non
     """
     Plot the distribution of a specified variable with mean and standard deviation bands.
 
-    Parameters
-    ----------
-    ax (matplotlib.axes.Axes): The axes on which to plot.
-    df (pd.DataFrame): The data frame containing the data.
-    index_col (str): The column in `df` to use as the index for pivoting.
-    val_col (str): The column in `df` containing the values to plot.
-    hue_col (str, optional): The column in `df` to use for color grouping.
-
-    Returns
-    -------
-    matplotlib.axes.Axes: The axes with the plot.
-
     This function creates a pivot table to \
         calculate the mean and standard deviation of `val_col`
     grouped by `index_col` and optionally by `hue_col`. \
           It then plots the mean values with bands
     representing one standard deviation above and below the mean.
+
+    Args:
+        ax (matplotlib.axes.Axes): The axes on which to plot.
+        df (pd.DataFrame): The data frame containing the data.
+        index_col (str): The column in `df` to use as the index for pivoting.
+        val_col (str): The column in `df` containing the values to plot.
+        hue_col (str, optional): The column in `df` to use for color grouping.
+
+    Returns:
+        ax (matplotlib.axes.Axes): The axes with the plot.
     """
     # Calculate mean values for the pivot table
     mean_values = pd.pivot_table(df, index=index_col, values=val_col, columns=hue_col, aggfunc=np.mean)

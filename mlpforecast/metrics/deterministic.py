@@ -22,9 +22,8 @@ def get_nbias(y, y_hat, axis=0):
         y_hat (ndarray): The predicted values.
         axis (int, optional): The axis along which to compute the NBias. Default is 0.
 
-    Returns
-    -------
-        float: The normalized bias value.
+    Returns:
+        (float): The normalized bias value.
     """
     epsilon = np.finfo(np.float64).eps  # Small value to avoid division by zero
     scale = y + y_hat  # Sum of true and predicted values
@@ -47,9 +46,8 @@ def get_smape(y, y_hat, axis=0):
         axis (int, optional): \
               The axis along which to compute the SMAPE. Default is 0.
 
-    Returns
-    -------
-        float: The symmetric mean absolute percentage error value.
+    Returns:
+        (float): The symmetric mean absolute percentage error value.
     """
     epsilon = np.finfo(np.float64).eps
     # Small value to avoid division by zero
@@ -60,12 +58,16 @@ def get_smape(y, y_hat, axis=0):
 
 
 def get_pointwise_metrics(pred: np.array, true: np.array, target_range: float = None):
-    """Calculate pointwise metrics
-    Args:   pred: predicted values
-            true: true values
-            target_range: target range
-    Returns:    rmse: root mean square error
+    """
+    Calculate pointwise metrics
 
+    Args:
+        pred (np.array): predicted values
+        true (np.array): true values
+        target_range (float): range of the target variable
+
+    Returns:
+        (dict): pointwise metrics
 
     """
     assert pred.ndim == 1, "pred must be 1-dimensional"
@@ -101,6 +103,52 @@ def get_pointwise_metrics(pred: np.array, true: np.array, target_range: float = 
     }
 
 
+def get_daily_pointwise_metrics(pred: np.array, true: np.array, target_range: float):
+    assert pred.ndim == 1, "pred must be 1-dimensional"
+    assert true.ndim == 1, "pred must be 1-dimensional"
+    assert pred.shape == true.shape, "pred and true must have the same shape"
+
+    # get pointwise metrics
+    metrics = get_pointwise_metrics(pred, true, target_range)
+    metrics = pd.DataFrame.from_dict(metrics, orient="index").T
+    return metrics
 
 
+def evaluate_point_forecast(outputs):
+    """
+    Evaluates point forecasts by computing daily pointwise metrics.
 
+    Args:
+        outputs (dict): A dictionary containing the true values, predicted values, and associated metadata.
+            Expected keys:
+                'true' (ndarray): The true values.
+                'loc' (ndarray): The predicted values.
+                'index' (ndarray): The timestamps for each prediction.
+                'targets' (list): The names of the target variables.
+
+    Returns:
+        (tuple): A tuple containing:
+            - pd_metrics (dict): DataFrame of combined metrics for each target variable.
+            - split_metrics (dict): Dictionary of metrics split by target variable.
+            - logs (dict): Any additional logs generated during the evaluation.
+    """
+    pd_metrics = pd.DataFrame()
+    for i in range(len(outputs["true"])):
+        metrics = []
+
+        for j in range(outputs["true"].shape[-1]):
+            true = outputs["true"][i, :, j]
+            pred = outputs["loc"][i, :, j]
+
+            point_scores = get_daily_pointwise_metrics(pred, true, None)
+            point_scores.insert(0, "target", outputs["targets"][j])
+            metrics.append(point_scores)
+
+        metrics_df = pd.concat(metrics)
+        df = pd.DataFrame(outputs["index"][i], columns=["Date"])
+        df["Date"] = pd.to_datetime(df["Date"], unit="ns")
+        metrics_df.insert(0, "timestamp", df.Date.dt.round("D").unique()[-1])
+        pd_metrics = pd.concat([pd_metrics, metrics_df], axis=0)
+    pd_metrics.set_index("timestamp", inplace=True)
+
+    return pd_metrics

@@ -15,6 +15,8 @@ from mlpforecast.data.processing import (
     get_n_sample_per_day,
 )
 
+def drop_na(data):
+    return data.dropna()
 
 def drop_na(data):
     return data.dropna()

@@ -17,6 +17,16 @@ logger = logging.getLogger("MLPF")
 
 
 class MLPForecast(PytorchForecast):
+    """
+    MLP Forecasting class for managing training, evaluation, and prediction.
+
+    Attributes:
+        hparams (dict): Hyperparameters for the MLP model.
+        model (MLPForecastModel): PyTorch model.
+        train_df (pd.DataFrame): Training DataFrame.
+        validation_df (pd.DataFrame): Validation DataFrame.
+    """
+    
     def __init__(
         self,
         hparams: dict,
@@ -113,8 +123,11 @@ class MLPForecast(PytorchForecast):
         Perform hyperparameter tuning using Optuna.
 
         Args:
-            train_df: Training DataFrame.
-            val_df: Validation DataFrame.
+            train_df (pd.DataFrame): Training DataFrame.
+            val_df (pd.DataFrame): Validation DataFrame.
+            num_trial (int, optional): Number of trials for hyperparameter optimization. Defaults to 10.
+            reduction_factor (int, optional): Reduction factor for Hyperband pruner. Defaults to 3.
+            patience (int, optional): Patience for the Patient pruner. Defaults to
         """
         self.train_df = train_df
         self.validation_df = val_df

@@ -10,6 +10,16 @@ logger = logging.getLogger("MLPF")
 
 
 class MLPForecastModel(BaseForecastModel):
+    """
+    MLP Forecast Model for time series point forecasting.
+
+    Attributes:
+        n_out (int): Number of output series.
+        n_channels (int): Number of input channels.
+        model (object): Model object.
+        hparams (dict): Hyperparameters for the model.
+    """
+
     def __init__(
         self,
         data_pipeline=None,
@@ -53,8 +63,7 @@ class MLPForecastModel(BaseForecastModel):
             hidden_size (int, optional): Dimensionality of the hidden layers. Defaults to 64.
             num_layers (int, optional): Number of layers in the MLP. Defaults to 2.
             expansion_factor (int, optional): Factor to expand the size of layers. Defaults to 2.
-            residual (bool, optional):\
-              Whether to use residual connections. Defaults to False.
+            residual (bool, optional): Whether to use residual connections. Defaults to False.
             activation_function (str, optional): \
                   Activation function to use in the hidden layers. Defaults to "ReLU".
             out_activation_function (str, optional): Activation function to use in the output layer. \
@@ -122,6 +131,7 @@ class MLPForecastModel(BaseForecastModel):
             num_attention_heads=num_attention_heads,
         )
 
+
     def forecast(self, x):
         """
         Generate forecast for the given input.
@@ -129,14 +139,21 @@ class MLPForecastModel(BaseForecastModel):
         Args:
             x (tensor): Input data for forecasting.
 
-        Returns
-        -------
-            tensor: Forecasted values.
+        Returns:
+            (tensor): Forecasted values.
         """
         return self.model.forecast(x)
 
+
     def forward(self, x):
+        """
+        Forward pass of the model.
+
+        Args:
+            x (tensor): Input data.
+        """
         return self.model(x)
+
 
     def training_step(self, batch, batch_idx):
         """
@@ -146,14 +163,14 @@ class MLPForecastModel(BaseForecastModel):
             batch (tuple): A batch of training data.
             batch_idx (int): Index of the batch.
 
-        Returns
-        -------
-            tensor: The loss value for the batch.
+        Returns:
+            (tensor): The loss value for the batch.
         """
         loss, metric = self.model.step(batch, self.tra_metric_fcn)
         self.log("train_loss", loss, prog_bar=True, logger=True)
         self.log(f"train_{self.hparams['metric']}", metric, prog_bar=True, logger=True)
         return loss
+
 
     def validation_step(self, batch, batch_idx):
         """
@@ -163,21 +180,20 @@ class MLPForecastModel(BaseForecastModel):
             batch (tuple): A batch of validation data.
             batch_idx (int): Index of the batch.
 
-        Returns
-        -------
-            tensor: The loss value for the batch.
+        Returns:
+            (tensor): The loss value for the batch.
         """
         loss, metric = self.model.step(batch, self.val_metric_fcn)
         self.log("val_loss", loss, prog_bar=True, logger=True)
         self.log(f"val_{self.hparams['metric']}", metric, prog_bar=True, logger=True)
 
+
     def configure_optimizers(self):
         """
         Configure optimizers and learning rate schedulers.
 
-        Returns
-        -------
-            tuple: A tuple containing the optimizer and the scheduler.
+        Returns:
+            (tuple): A tuple containing the optimizer and the scheduler.
         """
         p1 = int(self.hparams["prob_decay_1"] * self.hparams["max_epochs"])
         p2 = int(self.hparams["prob_decay_2"] * self.hparams["max_epochs"])

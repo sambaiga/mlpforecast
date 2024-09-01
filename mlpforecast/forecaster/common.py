@@ -60,8 +60,7 @@ class PytorchForecast:
         """
         Initializes the PytorchForecast class with the given parameters.
 
-        Parameters
-        ----------
+        Args:
             exp_name (str): The name of the experiment. Defaults to "Tanesco".
             file_name (str): The name of the file to save the logs and model checkpoints. Defaults to None.
             seed (int): The seed for random number generation. Defaults to 42.
@@ -85,9 +84,11 @@ class PytorchForecast:
         self.model_type = model_type
         self.rich_progress_bar = rich_progress_bar
         self.model = None
+        self.train_df=None
         self.datamodule = None
         self.gradient_clip_val = gradient_clip_val
         self._create_folder()
+
 
     def _create_folder(self):
         """
@@ -105,6 +106,7 @@ class PytorchForecast:
         else:
             self.checkpoints = Path(f"{self.root_dir}/checkpoints/{self.exp_name}/{self.model_type}")
         self.checkpoints.mkdir(parents=True, exist_ok=True)
+
 
     def _set_up_trainer(self):
         """
@@ -197,6 +199,7 @@ class PytorchForecast:
             #devices=1,
         )
 
+
     def fit(
         self,
         train_df,
@@ -220,9 +223,8 @@ class PytorchForecast:
             pin_memory (bool, optional): \
                 If True, the data loader will copy Tensors into CUDA pinned memory. Default is True.
 
-        Returns
-        -------
-            float: The training wall time or cost metric based on the training configuration.
+        Returns:
+            (float): The training wall time or cost metric based on the training configuration.
 
         Raises
         ------
@@ -303,8 +305,18 @@ class PytorchForecast:
         else:
             return self.train_walltime
 
+
     def load_and_prepare_data(self, test_df: pd.DataFrame, daily_feature: str):
-        """Loads the checkpoint and prepares the ground truth data."""
+        """
+        Loads the checkpoint and prepares the ground truth data.
+        
+        Args:
+            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
+            daily_feature (str): The daily feature to use in the model.
+
+        Returns:
+            ground_truth (pd.DataFrame): A DataFrame containing the ground truth data.
+        """
         self.load_checkpoint()
         self.model.data_pipeline.daily_features = daily_feature
 
@@ -315,8 +327,18 @@ class PytorchForecast:
         )
         return ground_truth
 
+
     def perform_prediction(self, test_df: pd.DataFrame):
-        """Performs the model prediction."""
+        """
+        Performs the model prediction.
+        
+        Args:
+            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
+
+        Returns:
+            (dict): A dictionary containing the forecasted values.
+        
+        """
         features, _ = self.model.data_pipeline.transform(test_df.copy())
         features = torch.FloatTensor(features.copy())
         self.model.to(features.device)
@@ -327,8 +349,24 @@ class PytorchForecast:
         self.test_walltime = default_timer() - start_time
         return output
 
-    def create_results_df(self, time_stamp, ground_truth, predictions, target_series, date_column):
-        """Creates a DataFrame with the timestamp index and populates it with ground truth and forecasted values."""
+
+    def create_results_df(
+        self, time_stamp, ground_truth, predictions, target_series, date_column
+    ):
+        """
+        Creates a DataFrame with the timestamp index and populates it with ground truth and forecasted values.
+        
+        Args:
+            time_stamp (np.array): The timestamp index.
+            ground_truth (np.array): The ground truth values.
+            predictions (np.array): The forecasted values.
+            target_series (list): A list of target series names.
+            date_column (str): The name of the date column.
+
+        Returns:
+            results_df (pd.DataFrame): A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
+        
+        """
         results_df = pd.DataFrame(index=pd.to_datetime(time_stamp.flatten(), unit="ns"))
         results_df.index.name = date_column
 
@@ -338,21 +376,45 @@ class PytorchForecast:
 
         return results_df
 
+
     def evaluate_point_forecast(self, ground_truth, pred, time_stamp):
-        """Evaluates the point forecast."""
-        return evaluate_point_forecast(
-            {
-                "true": ground_truth,
-                "loc": pred,
-                "index": time_stamp,
-                "targets": self.model.data_pipeline.target_series,
-            }
-        )
-    
-    def get_ground_truth(self, 
-                       test_df=None,  
-                       daily_feature=True):
+        """
+        Evaluates the point forecast.
+
+        Args:
+            ground_truth (np.array): The ground truth values.
+            pred (np.array): The forecasted values.
+            time_stamp (np.array): The timestamp index.
+
+        Returns:
+            (dict): A dictionary containing the evaluation metrics.
         
+        """
+        return evaluate_point_forecast({
+            "true": ground_truth,
+            "loc": pred,
+            "index": time_stamp,
+            "targets": self.model.data_pipeline.target_series,
+        })
+
+
+    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
+        """
+        Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
+
+        Args:
+            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
+            daily_feature (bool): Flag indicating whether daily features are used in the model. Default is True.
+
+        Returns:
+            results_df (pd.DataFrame): A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
+        """
+        if (test_df is not None) and (self.train_df is not None):
+            test_df = pd.concat([self.train_df, test_df], axis=0)
+        else:
+            assert ValueError("test_df can not be None")
+        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
+
         ground_truth = self.load_and_prepare_data(test_df, daily_feature)
         time_stamp = ground_truth[[self.model.data_pipeline.date_column]].values
         ground_truth = ground_truth[self.model.data_pipeline.target_series].values

@@ -1,7 +1,130 @@
-site_name: MLPF docs
+site_name: MLPForecast Docs
+site_description: "MLPF framework Documentation"
+site_url: "https://sambaiga.github.io/mlpforecast"
+repo_name: sambaiga/mlpforecast
+repo_url: https://github.com/sambaiga/mlpforecast
 
 theme:
   name: "material"
+  # name: readthedocs
+  # highlightjs: true
+  features:
+  - announce.dismiss
+  # - content.action.edit
+  # - content.action.view
+  - content.code.annotate
+  - content.code.copy
+  - content.tooltips
+  - navigation.footer
+  - navigation.indexes
+  - navigation.sections
+  - navigation.tabs
+  - navigation.tabs.sticky
+  - navigation.top
+  - search.highlight
+  - search.suggest
+  - toc.follow
+  palette:
+  - media: "(prefers-color-scheme)"
+    toggle:
+      icon: material/brightness-auto
+      name: Switch to light mode
+  - media: "(prefers-color-scheme: light)"
+    scheme: default
+    primary: teal
+    accent: purple
+    toggle:
+      icon: material/weather-sunny
+      name: Switch to dark mode
+  - media: "(prefers-color-scheme: dark)"
+    scheme: slate
+    primary: black
+    accent: lime
+    toggle:
+      icon: material/weather-night
+      name: Switch to system preference
+
+extra_css:
+- css/material.css
+- css/mkdocstrings.css
+- css/insiders.css
+
+extra_javascript:
+- js/feedback.js
 
 plugins:
-  - mkdocstrings
+  - search
+  - macros
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          import:
+          - https://docs.python.org/3/objects.inv
+          - https://mkdocstrings.github.io/objects.inv
+          - https://mkdocstrings.github.io/griffe/objects.inv
+          - https://python-markdown.github.io/objects.inv
+          options:
+            docstring_options:
+              ignore_init_summary: true
+            docstring_section_style: list
+            filters: ["!^_"]
+            heading_level: 1
+            inherited_members: true
+            merge_init_into_class: true
+            parameter_headings: true
+            preload_modules: [mkdocstrings]
+            separate_signature: true
+            show_root_heading: false
+            show_root_full_path: false
+            show_signature_annotations: true
+            show_source: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            signature_crossrefs: true
+            summary: true
+            unwrap_annotated: true
+
+nav:
+  - MLPForecast Docs: index.md
+  - Tutorial - User Guide:
+    - MLPForecast: forecaster.md
+    - Model: model.md
+    - Net: net.md
+    - Evaluation: evaluation.md
+    - Metrics: metrics.md
+    - Plot: plot.md
+    - Stats: stats.md
+
+markdown_extensions:
+- abbr
+- attr_list
+- admonition
+- footnotes
+- md_in_html
+- pymdownx.snippets
+- pymdownx.blocks.admonition
+- pymdownx.blocks.details
+- pymdownx.blocks.tab:
+    alternate_style: true
+    slugify: !!python/object/apply:pymdownx.slugs.slugify
+      kwds:
+        case: lower
+- pymdownx.emoji:
+    emoji_index: !!python/name:material.extensions.emoji.twemoji
+    emoji_generator: !!python/name:material.extensions.emoji.to_svg
+- pymdownx.highlight:
+    pygments_lang_class: true
+- pymdownx.inlinehilite:
+    style_plain_text: py3
+- pymdownx.magiclink
+- pymdownx.superfences
+- pymdownx.tabbed:
+    alternate_style: true
+    slugify: !!python/object/apply:pymdownx.slugs.slugify
+      kwds:
+        case: lower
+- pymdownx.tasklist:
+    custom_checkbox: true
+- toc:
+    # permalink: "¤"
