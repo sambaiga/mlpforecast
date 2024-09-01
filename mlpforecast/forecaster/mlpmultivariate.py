@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
+import pandas as pd
 import optuna
 from optuna import Trial
 
@@ -71,6 +72,28 @@ class MLPMultivarGaussForecast(PytorchForecast):
         path_best_model = get_latest_checkpoint(self.checkpoints)
         self.model =  MLPMultivarGaussModel.load_from_checkpoint(path_best_model)
         self.model.eval()
+
+    def forecast(self, test_df=None, covariate_df=None, daily_feature=True, n_samples=1000):
+        if test_df is not None:
+            test_df = pd.concat([self.train_df, test_df], axis=0)
+        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
+
+        # Inverse transform predictions
+        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
+        target_scaler = scaler.named_transformers_["target_scaler"]
+
+        pred=self.perform_prediction(test_df=test_df)
+
+        N, T, C = pred["loc"].size()
+        pred["loc"] = target_scaler.inverse_transform(pred["loc"].numpy().reshape(N * T, C))
+        pred["loc"] = pred["loc"].reshape(N, T, C)
+        pred['scale']=target_scaler.scale_*pred['scale'].numpy()
+        pred['samples']=pred['decoder_dist'].sample((n_samples,))
+
+        N, B,  T, C = pred['samples'].shape
+        pred['q_samples']=target_scaler.inverse_transform(pred['samples'].numpy().reshape(N*B*T, C))
+        pred['samples']=pred['samples'].reshape(N, B,T, C)
+        return pred
 
     def get_search_params(self, trial: Trial) -> dict:
         """

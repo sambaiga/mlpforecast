@@ -433,6 +433,36 @@ class MLPForecastNetwork(nn.Module):
 
         return {"pred": pred}
 
+    def compute_combined_projection_feature(self, x):
+        """
+        Get combined projection MLPForecastNetwork.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after processing through the network.
+        """
+        f = self.encoder(x[:, : self.input_window_size, :])
+
+        if self.n_covariates > 0:
+            h = self.horizon(x[:, self.input_window_size :, self.n_unknown :])
+            if self.combination_type == "attn-comb":
+                ph_hf = self.attention(h.unsqueeze(0), f.unsqueeze(0), f.unsqueeze(0))[
+                    0
+                ].squeeze(0)
+            elif self.combination_type == "weighted-comb":
+                gate = self.gate(torch.cat((h, f), -1)).sigmoid()
+                ph_hf = (1 - gate) * f + gate * h
+            else:
+                ph_hf = h + f
+        else:
+            ph_hf = f
+
+        z = self.decoder(ph_hf)
+        return z
+
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
