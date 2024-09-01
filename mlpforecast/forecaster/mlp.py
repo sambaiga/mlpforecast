@@ -173,6 +173,22 @@ class MLPForecast(PytorchForecast):
         self.hparams.update(study.best_trial.params)
         np.save(f"{self.results_path}/best_params.npy", study.best_trial.params)
 
+
+    def forecast(self, test_df=None, covariate_df=None, daily_feature=True):
+        if test_df is not None:
+            test_df = pd.concat([self.train_df, test_df], axis=0)
+        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
+
+        # Inverse transform predictions
+        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
+        target_scaler = scaler.named_transformers_["target_scaler"]
+
+        pred=self.perform_prediction(test_df=test_df)
+        N, T, C = pred["pred"].size()
+        pred["pred"] = target_scaler.inverse_transform(pred["pred"].numpy().reshape(N * T, C))
+        pred["pred"] = pred["pred"].reshape(N, T, C)
+        return pred
+
     def predict(self, test_df=None, covariate_df=None, daily_feature=True):
         """
         Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
@@ -185,6 +201,8 @@ class MLPForecast(PytorchForecast):
         -------
             pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
         """
+        pred=self.forecast(test_df, covariate_df, daily_feature)
+        
         if test_df is not None:
             test_df = pd.concat([self.train_df, test_df], axis=0)
         test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
@@ -192,26 +210,17 @@ class MLPForecast(PytorchForecast):
         time_stamp, ground_truth = self.get_ground_truth(test_df=test_df, 
                                                          daily_feature=daily_feature)
 
-        # Inverse transform predictions
-        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
-        target_scaler = scaler.named_transformers_["target_scaler"]
-
-        pred=self.perform_prediction(test_df=test_df)
-
-        N, T, C = pred["pred"].size()
-        pred["pred"] = target_scaler.inverse_transform(pred["pred"].numpy().reshape(N * T, C))
-        pred["pred"] = pred["pred"].reshape(N, T, C)
+        # Assert that the prediction and ground truth shapes are the same
+        if pred["pred"].shape != ground_truth.shape:
+            raise ValueError("Shape mismatch: pred['pred'] and ground_truth must have the same shape.")
+      
 
         # Evaluate point forecast
         self.metrics = self.evaluate_point_forecast(ground_truth, pred["pred"], time_stamp)
         self.metrics["test-time"] = self.test_walltime
         self.metrics["Model"] = self.model_type.upper()
 
-        # Assert that the prediction and ground truth shapes are the same
-        assert (
-            pred["pred"].shape == ground_truth.shape
-        ), "Shape mismatch: pred['pred'] and ground_truth must have the same shape."
-
+        
         # Create results DataFrame
         results_df = self.create_results_df(
             time_stamp,

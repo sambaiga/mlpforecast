@@ -74,24 +74,10 @@ class MLPFQRForecast(PytorchForecast):
         self.model = MLPFQRForecastModel.load_from_checkpoint(path_best_model)
         self.model.eval()
 
-    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
-        """
-        Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
-
-        Args:
-            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
-            daily_feature (bool): Flag indicating whether daily features are used in the model. Default is True.
-
-        Returns
-        -------
-            pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
-        """
+    def forecast(self, test_df=None, covariate_df=None, daily_feature=True):
         if test_df is not None:
             test_df = pd.concat([self.train_df, test_df], axis=0)
         test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
-
-        time_stamp, ground_truth = self.get_ground_truth(test_df=test_df, 
-                                                         daily_feature=daily_feature)
 
         # Inverse transform predictions
         scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
@@ -106,12 +92,32 @@ class MLPFQRForecast(PytorchForecast):
         N, B,  T, C = pred['q_samples'].shape
         pred['q_samples']=target_scaler.inverse_transform(pred["q_samples"].numpy().reshape(N*B*T, C))
         pred['q_samples']=pred['q_samples'].reshape(N, B,T, C)
+        return pred
 
-        # Assert that the prediction and ground truth shapes are the same
-        assert (
-            pred["loc"].shape == ground_truth.shape
-        ), "Shape mismatch: pred['pred'] and ground_truth must have the same shape."
+    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
+        """
+        Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
 
+        Args:
+            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
+            daily_feature (bool): Flag indicating whether daily features are used in the model. Default is True.
+
+        Returns
+        -------
+            pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
+        """
+        pred=self.forecast(test_df, covariate_df, daily_feature)
+        if test_df is not None:
+            test_df = pd.concat([self.train_df, test_df], axis=0)
+        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
+
+        time_stamp, ground_truth = self.get_ground_truth(test_df=test_df, 
+                                                         daily_feature=daily_feature)
+
+        
+        if pred["loc"].shape != ground_truth.shape:
+            raise ValueError("Shape mismatch: pred['pred'] and ground_truth must have the same shape.")
+        
         # Create results DataFrame
         results_df = self.create_results_df(
             time_stamp,
@@ -131,7 +137,7 @@ class MLPFQRForecast(PytorchForecast):
         self.metrics["test-time"] = self.test_walltime
         self.metrics["Model"] = self.model_type.upper()
 
-        return results_df, pred
+        return results_df
 
     def create_results_df(self, time_stamp, ground_truth, predictions, target_series, date_column):
         """Creates a DataFrame with the timestamp index and populates it with ground truth and forecasted values."""
