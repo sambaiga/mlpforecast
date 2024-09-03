@@ -203,7 +203,5 @@ class MLPForecastModel(BaseForecastModel):
             lr=self.hparams["learning_rate"],
             weight_decay=self.hparams["weight_decay"],
         )
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer, milestones=[p1, p2], gamma=self.hparams["gamma"]
-        )
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[p1, p2], gamma=self.hparams["gamma"])
         return [optimizer], [scheduler]

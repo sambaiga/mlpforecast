@@ -54,15 +54,15 @@ def create_linear(in_channels, out_channels, bn=False):
     return m
 
 
-def FeedForward(dim, expansion_factor=2, dropout=0.0, activation=nn.GELU(), bn=True):
+def FeedForward(dim: int, expansion_factor: int, dropout: float, activation: torch.nn.Module, bn=True):
     """
     Creates a feedforward block composed of linear layers, activation function, and dropout.
 
     Args:
         dim (int): Dimensionality of the input.
         expansion_factor (int, optional): Expansion factor for the intermediate hidden layer. Defaults to 2.
-        dropout (float, optional): Dropout probability. Defaults to 0.0 (no dropout).
-        activation (torch.nn.Module, optional): Activation function. Defaults to GELU().
+        dropout (float, optional): Dropout probability.
+        activation (torch.nn.Module, optional): Activation function.
         bn (bool, optional): If True, adds batch normalization. Defaults to True.
 
     Returns:
@@ -106,7 +106,8 @@ class MLPBlock(nn.Module):
         """
         Multi-Layer Perceptron (MLP) block with configurable layers and options.
 
-        Parameters:
+        Parameters
+        ----------
             in_size (int, optional): Size of the input. Defaults to 1.
             latent_dim (int, optional): Dimensionality of the latent space. Defaults to 32.
             features_start (int, optional): Number of features in the initial layer. Defaults to 16.
@@ -134,18 +135,12 @@ class MLPBlock(nn.Module):
         feats = features_start
 
         # Create the specified number of layers in the MLP
-        for i in range(num_layers - 1):
-            layers.append(
-                nn.Sequential(
-                    create_linear(feats, feats * expansion_factor, bn=bn), activation
-                )
-            )
+        for _ in range(num_layers - 1):
+            layers.append(nn.Sequential(create_linear(feats, feats * expansion_factor, bn=bn), activation))
             feats = feats * expansion_factor
 
         # Add the final layer with latent_dim and activation, without batch normalization
-        layers.append(
-            nn.Sequential(create_linear(feats, latent_dim, bn=False), activation)
-        )
+        layers.append(nn.Sequential(create_linear(feats, latent_dim, bn=False), activation))
 
         # Create a ModuleList to store the layers
         self.mlp_network = nn.ModuleList(layers)
@@ -154,7 +149,8 @@ class MLPBlock(nn.Module):
         """
         Forward pass of the MLP block.
 
-        Parameters:
+        Parameters
+        ----------
             x (torch.Tensor): Input tensor.
 
         Returns:
@@ -242,15 +238,11 @@ class PastFutureEncoder(nn.Module):
 
         # Embedding based on the specified type
         if embedding_type == "PosEmb":
-            self.embedding = PosEmbedding(
-                n_channels, embedding_size, window_size=context_size
-            )
+            self.embedding = PosEmbedding(n_channels, embedding_size, window_size=context_size)
         elif embedding_type == "RotaryEmb":
             self.embedding = RotaryEmbedding(embedding_size)
         elif embedding_type == "CombinedEmb":
-            self.pos_embedding = PosEmbedding(
-                n_channels, embedding_size, window_size=context_size
-            )
+            self.pos_embedding = PosEmbedding(n_channels, embedding_size, window_size=context_size)
             self.rotary_embedding = RotaryEmbedding(embedding_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -260,7 +252,8 @@ class PastFutureEncoder(nn.Module):
         Args:
             x (torch.Tensor): Input tensor.
 
-        Returns:
+        Returns
+        -------
             torch.Tensor: Output tensor after processing through the encoder.
         """
         # Normalize the input
@@ -352,21 +345,15 @@ class MLPForecastNetwork(nn.Module):
         super().__init__()
 
         # Ensure valid activation and embedding types
-        assert (
-            activation_function in ACTIVATIONS
-        ), f"Invalid activation_function. Please select from: {ACTIVATIONS}"
-        assert (
-            out_activation_function in ACTIVATIONS
-        ), f"Invalid out_activation_function. Please select from: {ACTIVATIONS}"
-        assert (
-            embedding_type
-            in [
-                None,
-                "PosEmb",
-                "RotaryEmb",
-                "CombinedEmb",
-            ]
-        ), "Invalid embedding type, choose from: None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'"
+        if activation_function not in ACTIVATIONS:
+            raise ValueError(f"Invalid activation_function. Please select from: {ACTIVATIONS}")
+
+        if out_activation_function not in ACTIVATIONS:
+            raise ValueError(f"Invalid out_activation_function. Please select from: {ACTIVATIONS}")
+
+        valid_embedding_types = [None, "PosEmb", "RotaryEmb", "CombinedEmb"]
+        if embedding_type not in valid_embedding_types:
+            raise ValueError(f"Invalid embedding type, choose from: {valid_embedding_types}")
 
         self.n_out = n_target_series
         self.n_unknown = n_unknown_features + self.n_out
@@ -407,19 +394,12 @@ class MLPForecastNetwork(nn.Module):
         self.combination_type = combination_type
         self.alpha = alpha
 
-        assert (
-            combination_type
-            in [
-                "attn-comb",
-                "weighted-comb",
-                "addition-comb",
-            ]
-        ), "Invalid combination type, choose from: 'attn-comb', 'weighted-comb', 'addition-comb'"
+        valid_combination_types = ["attn-comb", "weighted-comb", "addition-comb"]
+        if combination_type not in valid_combination_types:
+            raise ValueError(f"Invalid combination type, choose from: {valid_combination_types}")
 
         if combination_type == "attn-comb":
-            self.attention = nn.MultiheadAttention(
-                hidden_size, num_attention_heads, dropout=dropout_rate
-            )
+            self.attention = nn.MultiheadAttention(hidden_size, num_attention_heads, dropout=dropout_rate)
 
         if combination_type == "weighted-comb":
             self.gate = nn.Linear(2 * hidden_size, hidden_size)
@@ -444,7 +424,8 @@ class MLPForecastNetwork(nn.Module):
         Args:
             x (torch.Tensor): Input tensor.
 
-        Returns:
+        Returns
+        -------
             dict: Dictionary containing the forecast predictions.
         """
         with torch.no_grad():
@@ -452,10 +433,9 @@ class MLPForecastNetwork(nn.Module):
 
         return {"pred": pred}
 
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def compute_combined_projection_feature(self, x):
         """
-        Forward pass of the MLPForecastNetwork.
+        Get combined projection MLPForecastNetwork.
 
         Args:
             x (torch.Tensor): Input tensor.
@@ -480,9 +460,24 @@ class MLPForecastNetwork(nn.Module):
             ph_hf = f
 
         z = self.decoder(ph_hf)
-        loc = self.out_activation(
-            self.mu(z).reshape(z.size(0), self.forecast_horizon, self.n_out)
-        )
+        return z
+
+
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the MLPForecastNetwork.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns
+        -------
+            torch.Tensor: Output tensor after processing through the network.
+        """
+        ph_hf = self.compute_combined_projection_feature(x)
+        z = self.decoder(ph_hf)
+        loc = self.out_activation(self.mu(z).reshape(z.size(0), self.forecast_horizon, self.n_out))
 
         return loc
 
@@ -495,7 +490,8 @@ class MLPForecastNetwork(nn.Module):
             batch (tuple): Tuple containing input and target tensors.
             metric_fn (callable): Metric function to evaluate.
 
-        Returns:
+        Returns
+        -------
             tuple: Tuple containing the loss and computed metric.
         """
         x, y = batch
@@ -504,8 +500,7 @@ class MLPForecastNetwork(nn.Module):
 
         loss = (
             self.alpha * F.mse_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
-            + (1 - self.alpha)
-            * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
+            + (1 - self.alpha) * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
         )
 
         metric = metric_fn(y_pred, y)

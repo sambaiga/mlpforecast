@@ -94,9 +94,7 @@ def plot_correlation(ax, corr_df, cmap=sns.diverging_palette(240, 10, as_cmap=Tr
     return ax
 
 
-def scatter_plot(
-    data, variables, targets, hue_col=None, n_sample=1000, random_state=111
-):
+def scatter_plot(data, variables, targets, hue_col=None, n_sample=1000, random_state=111):
     """
     Creates a scatter plot matrix using Altair.
 
@@ -111,25 +109,17 @@ def scatter_plot(
     Returns:
         chart (alt.Chart): The Altair chart object with the scatter plot matrix.
     """
-    data = (
-        data.sample(n=n_sample, random_state=random_state)
-        if n_sample is not None
-        else data
-    )
+    data = data.sample(n=n_sample, random_state=random_state) if n_sample is not None else data
     chart = alt.Chart(data)
     if hue_col is not None:
         chart = chart.mark_point(filled=True, opacity=0.7).encode(
-            alt.X(
-                alt.repeat("column"), type="quantitative", scale=alt.Scale(zero=False)
-            ),
+            alt.X(alt.repeat("column"), type="quantitative", scale=alt.Scale(zero=False)),
             alt.Y(alt.repeat("row"), type="quantitative", scale=alt.Scale(zero=False)),
             color=f"{hue_col}:N",
         )
     else:
         chart = chart.mark_point(filled=True, opacity=0.7).encode(
-            alt.X(
-                alt.repeat("column"), type="quantitative", scale=alt.Scale(zero=False)
-            ),
+            alt.X(alt.repeat("column"), type="quantitative", scale=alt.Scale(zero=False)),
             alt.Y(alt.repeat("row"), type="quantitative", scale=alt.Scale(zero=False)),
         )
 
@@ -159,9 +149,7 @@ def visualise_timeseries_altair(data, y_col, figure_path=None, y_label="Power (k
         alt.Chart(data.reset_index())
         .mark_point(filled=True, opacity=0.7)
         .encode(
-            x=alt.X(
-                "timestamp:T", scale=alt.Scale(zero=False), axis=alt.Axis(title="Date")
-            ),
+            x=alt.X("timestamp:T", scale=alt.Scale(zero=False), axis=alt.Axis(title="Date")),
             y=alt.X(f"{y_col[0]}:Q", scale=alt.Scale(zero=False), title=y_label),
             color=alt.value(colors[0]),
         )
@@ -257,13 +245,9 @@ def plot_distribution(ax, df, index_col="HOUR", val_col="WindSpeed", hue_col=Non
         ax (matplotlib.axes.Axes): The axes with the plot.
     """
     # Calculate mean values for the pivot table
-    mean_values = pd.pivot_table(
-        df, index=index_col, values=val_col, columns=hue_col, aggfunc=np.mean
-    )
+    mean_values = pd.pivot_table(df, index=index_col, values=val_col, columns=hue_col, aggfunc=np.mean)
     # Calculate standard deviation values for the pivot table
-    std_dev = pd.pivot_table(
-        df, index=index_col, values=val_col, columns=hue_col, aggfunc=np.std
-    )
+    std_dev = pd.pivot_table(df, index=index_col, values=val_col, columns=hue_col, aggfunc=np.std)
 
     # Plot the mean values
     mean_values.plot(ax=ax)

@@ -27,11 +27,10 @@ def get_nbias(y, y_hat, axis=0):
     """
     epsilon = np.finfo(np.float64).eps  # Small value to avoid division by zero
     scale = y + y_hat  # Sum of true and predicted values
-    nbias = (y - y_hat) / np.maximum(scale, epsilon)  # Normalized bias calculation
+    # Normalized bias calculation
+    nbias = (y - y_hat) / np.maximum(scale, epsilon)
     output_errors = nbias
-    return np.sum(
-        output_errors, axis=axis
-    )  # Sum of output errors along the specified axis
+    return np.sum(output_errors, axis=axis)  # Sum of output errors along the specified axis
 
 
 def get_smape(y, y_hat, axis=0):
@@ -54,9 +53,7 @@ def get_smape(y, y_hat, axis=0):
     # Small value to avoid division by zero
     scale = np.abs(y) + np.abs(y_hat)
     # Sum of absolute true and predicted values
-    output_errors = 2 * (
-        np.abs(y - y_hat) / np.maximum(scale, epsilon)
-    )  # SMAPE calculation
+    output_errors = 2 * (np.abs(y - y_hat) / np.maximum(scale, epsilon))  # SMAPE calculation
     return np.average(output_errors, axis=axis)
 
 
