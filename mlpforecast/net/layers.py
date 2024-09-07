@@ -648,7 +648,7 @@ class MLPGAMForecastNetwork(nn.Module):
             dict: Dictionary containing the forecast predictions.
         """
         with torch.no_grad():
-            pred = self(x)[0]
+            pred = self(x)
 
         return {"pred": pred}
 
@@ -690,17 +690,12 @@ class MLPGAMForecastNetwork(nn.Module):
         
             # Combine past and future feature outputs
             combined_output = self.bias + past_features_transformed + future_features_transformed
-            combined_output = self.out_activation(combined_output.reshape(x.size(0), self.forecast_horizon, self.n_out))
-            past_features_transformed=past_features_transformed.reshape(x.size(0), self.forecast_horizon, self.n_out)
-            future_features_transformed=future_features_transformed.reshape(x.size(0), self.forecast_horizon, self.n_out)
-            return combined_output, past_features_transformed, future_features_transformed
         else:
             combined_output = self.bias + past_features_transformed
-            combined_output = self.out_activation(combined_output.reshape(x.size(0), self.forecast_horizon, self.n_out))
-            past_features_transformed=past_features_transformed.reshape(x.size(0), self.forecast_horizon, self.n_out)
-            return combined_output, past_features_transformed
-
-
+        
+        loc = self.out_activation(combined_output.reshape(x.size(0), self.forecast_horizon, self.n_out))
+        return loc
+    
     def step(self, batch: tuple, metric_fn: callable) -> tuple:
         """
         Training step for the MLPForecastNetwork.
@@ -715,28 +710,16 @@ class MLPGAMForecastNetwork(nn.Module):
         """
         x, y = batch
 
-        if self.n_covariates > 0:
-            loc, past_loc, future_loc = self(x)
-            loss_3 = (
-            self.alpha * F.mse_loss(future_loc, y, reduction="none").sum(dim=(1, 2)).mean()
-            + (1 - self.alpha) * F.l1_loss(future_loc, y, reduction="none").sum(dim=(1, 2)).mean())
-            loss_3+=self.lasso_penalty(self.future_feature_transform, self.alpha*1e-1)
-        else:
-            loc, past_loc = self(x)
-            loss_3=0.0
+        
+        loc = self(x)
+        
 
-        loss_1 = (
+        loss = (
             self.alpha * F.mse_loss(loc, y, reduction="none").sum(dim=(1, 2)).mean()
             + (1 - self.alpha) * F.l1_loss(loc, y, reduction="none").sum(dim=(1, 2)).mean()
         )
-        loss_2 = (
-            self.alpha * F.mse_loss(past_loc, y, reduction="none").sum(dim=(1, 2)).mean()
-            + (1 - self.alpha) * F.l1_loss(past_loc, y, reduction="none").sum(dim=(1, 2)).mean()
-        )
-        loss_2+=self.lasso_penalty(self.past_feature_transform, self.alpha*1e-1)
-
+        
         metric = metric_fn(loc, y)
-        loss = loss_1 + (loss_2 + loss_3)*self.alpha
-
+        
         return loss, metric
 

@@ -211,8 +211,8 @@ class MLPGAMForecast(PytorchForecast):
                                                          daily_feature=daily_feature)
 
         # Assert that the prediction and ground truth shapes are the same
-        if pred["pred"].shape != ground_truth.shape:
-            raise ValueError("Shape mismatch: pred['pred'] and ground_truth must have the same shape.")
+        #if pred["pred"].shape != ground_truth.shape:
+        #    raise ValueError("Shape mismatch: pred['pred'] and ground_truth must have the same shape.")
       
 
         # Evaluate point forecast
