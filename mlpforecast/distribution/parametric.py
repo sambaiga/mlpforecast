@@ -157,6 +157,7 @@ class LaplaceDistribution(ParametricDistribution):
             return forecast_dist.sample((num_samples, ))
 
 
+
 class MCDMultivariateNormal(ParametricDistribution):
     """
     MultivariateNormalForecasting is a neural network model for forecasting multivariate 
