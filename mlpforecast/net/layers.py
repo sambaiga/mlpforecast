@@ -506,3 +506,222 @@ class MLPForecastNetwork(nn.Module):
         metric = metric_fn(y_pred, y)
 
         return loss, metric
+    
+
+
+class MLPGAMForecastNetwork(nn.Module):
+    """
+    Multilayer Perceptron (MLP) Forecast Network for time series forecasting.
+
+    Attributes:
+        n_out (int): Number of target series.
+        n_unknown (int): Number of unknown time-varying features.
+        n_covariates (int): Number of known time-varying features.
+        n_channels (int): Number of channels in the input.
+        input_window_size (int): Size of the input window.
+        forecast_horizon (int): Number of future time steps to forecast.
+        out_activation (torch.nn.Module): Output activation function.
+        activation (torch.nn.Module): Activation function.
+        encoder (PastFutureEncoder): Encoder module.
+        horizon (PastFutureEncoder): Horizon encoder module.
+        combination_type (str): Type of combination to use.
+        alpha (float): Alpha parameter for the loss.
+        attention (nn.MultiheadAttention): Multi-head attention module.
+        gate (nn.Linear): Linear layer for weighted combination.
+        decoder (nn.Sequential): Decoder module.
+        mu (nn.Linear): Linear layer for output.
+    """
+
+    def __init__(
+        self,
+        n_target_series: int,
+        n_unknown_features: int,
+        n_known_calendar_features: int,
+        n_known_continuous_features: int,
+        embedding_size: int = 28,
+        embedding_type: str = None,
+        combination_type: str = "attn-comb",
+        expansion_factor: int = 2,
+        residual: bool = False,
+        hidden_size: int = 256,
+        num_layers: int = 2,
+        forecast_horizon: int = 48,
+        input_window_size: int = 96,
+        activation_function: str = "SiLU",
+        out_activation_function: str = "Identity",
+        dropout_rate: float = 0.25,
+        alpha: float = 0.1,
+        num_attention_heads: int = 4,
+    ):
+        """
+        Multilayer Perceptron (MLP) Forecast Network for time series forecasting.
+
+        Args:
+            n_target_series (int): Number of target series.
+            n_unknown_features (int): Number of unknown time-varying features.
+            n_known_calendar_features (int): Number of known categorical time-varying features.
+            n_known_continuous_features (int): Number of known continuous time-varying features.
+            embedding_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
+            embedding_type (str, optional): Type of embedding to use. Defaults to None. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'.
+            combination_type (str, optional): Type of combination to use.Defaults to 'attn-comb'. Options: 'attn-comb', 'weighted-comb', 'addition-comb'.
+            expansion_factor (int, optional): Expansion factor for the encoder. Defaults to 2.
+            residual (bool, optional): Whether to use residual connections in the encoder. Defaults to False.
+            hidden_size (int, optional): Dimensionality of the hidden layers. Defaults to 256.
+            num_layers (int, optional): Number of layers in the MLP. Defaults to 2.
+            forecast_horizon (int, optional): Number of future time steps to forecast. Defaults to 48.
+            input_window_size (int, optional): Size of the input window. Defaults to 96.
+            activation_function (str, optional): Activation function. Defaults to 'SiLU'.
+            out_activation_function (str, optional): Output activation function. Defaults to 'Identity'.
+            dropout_rate (float, optional): Dropout probability. Defaults to 0.25.
+            alpha (float, optional): Alpha parameter for the loss. Defaults to 0.1.
+            num_attention_heads (int, optional): Number of heads in the multi-head attention. Defaults to 4.
+        """
+        super().__init__()
+
+        # Ensure valid activation and embedding types
+        if activation_function not in ACTIVATIONS:
+            raise ValueError(f"Invalid activation_function. Please select from: {ACTIVATIONS}")
+
+        if out_activation_function not in ACTIVATIONS:
+            raise ValueError(f"Invalid out_activation_function. Please select from: {ACTIVATIONS}")
+
+        valid_embedding_types = [None, "PosEmb", "RotaryEmb", "CombinedEmb"]
+        if embedding_type not in valid_embedding_types:
+            raise ValueError(f"Invalid embedding type, choose from: {valid_embedding_types}")
+
+        self.n_out = n_target_series
+        self.n_unknown = n_unknown_features + self.n_out
+        self.n_covariates = n_known_calendar_features + n_known_continuous_features
+        self.n_channels = self.n_unknown + self.n_covariates
+        self.input_window_size = input_window_size
+        self.forecast_horizon = forecast_horizon
+        self.out_activation = getattr(nn, out_activation_function)()
+        self.activation = getattr(nn, activation_function)()
+
+        self.encoder = PastFutureEncoder(
+            embedding_size=embedding_size,
+            embedding_type=embedding_type,
+            latent_size=hidden_size,
+            num_layers=num_layers,
+            residual=residual,
+            expansion_factor=expansion_factor,
+            context_size=input_window_size,
+            activation=self.activation,
+            dropout_rate=dropout_rate,
+            n_channels=self.n_channels,
+        )
+
+        if self.n_covariates > 0:
+            self.horizon = PastFutureEncoder(
+                embedding_size=embedding_size,
+                embedding_type=embedding_type,
+                latent_size=hidden_size,
+                num_layers=num_layers,
+                residual=residual,
+                expansion_factor=expansion_factor,
+                context_size=forecast_horizon,
+                activation=self.activation,
+                dropout_rate=dropout_rate,
+                n_channels=self.n_covariates,
+            )
+
+        self.combination_type = combination_type
+        self.alpha = alpha
+        self.b
+
+        
+        
+
+        self.mu = nn.Linear(hidden_size, self.n_out * forecast_horizon)
+
+
+    def forecast(self, x: torch.Tensor) -> dict:
+        """
+        Generates forecasts for the input sequences.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns
+        -------
+            dict: Dictionary containing the forecast predictions.
+        """
+        with torch.no_grad():
+            pred = self(x)
+
+        return {"pred": pred}
+
+    def compute_combined_projection_feature(self, x):
+        """
+        Get combined projection MLPForecastNetwork.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after processing through the network.
+        """
+        f = self.encoder(x[:, : self.input_window_size, :])
+
+        if self.n_covariates > 0:
+            h = self.horizon(x[:, self.input_window_size :, self.n_unknown :])
+            if self.combination_type == "attn-comb":
+                ph_hf = self.attention(h.unsqueeze(0), f.unsqueeze(0), f.unsqueeze(0))[
+                    0
+                ].squeeze(0)
+            elif self.combination_type == "weighted-comb":
+                gate = self.gate(torch.cat((h, f), -1)).sigmoid()
+                ph_hf = (1 - gate) * f + gate * h
+            else:
+                ph_hf = h + f
+        else:
+            ph_hf = f
+
+        z = self.decoder(ph_hf)
+        return z
+
+
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the MLPForecastNetwork.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns
+        -------
+            torch.Tensor: Output tensor after processing through the network.
+        """
+        ph_hf = self.compute_combined_projection_feature(x)
+        z = self.decoder(ph_hf)
+        loc = self.out_activation(self.mu(z).reshape(z.size(0), self.forecast_horizon, self.n_out))
+
+        return loc
+
+
+    def step(self, batch: tuple, metric_fn: callable) -> tuple:
+        """
+        Training step for the MLPForecastNetwork.
+
+        Args:
+            batch (tuple): Tuple containing input and target tensors.
+            metric_fn (callable): Metric function to evaluate.
+
+        Returns
+        -------
+            tuple: Tuple containing the loss and computed metric.
+        """
+        x, y = batch
+
+        y_pred = self(x)
+
+        loss = (
+            self.alpha * F.mse_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
+            + (1 - self.alpha) * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
+        )
+
+        metric = metric_fn(y_pred, y)
+
+        return loss, metric
+
