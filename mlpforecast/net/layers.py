@@ -627,12 +627,13 @@ class MLPGAMForecastNetwork(nn.Module):
 
         self.combination_type = combination_type
         self.alpha = alpha
-        self.b
-
+        self.bias = nn.Parameter(torch.zeros(self.n_out * forecast_horizon))  # Bias term
+        # Linear transformations for encoded features
+        self.past_feature_transform = nn.Linear(hidden_size, self.n_out * forecast_horizon, bias=False)
         
+        if self.n_covariates > 0:
+            self.future_feature_transform = nn.Linear(hidden_size, self.n_out * forecast_horizon, bias=False)
         
-
-        self.mu = nn.Linear(hidden_size, self.n_out * forecast_horizon)
 
 
     def forecast(self, x: torch.Tensor) -> dict:
@@ -647,40 +648,25 @@ class MLPGAMForecastNetwork(nn.Module):
             dict: Dictionary containing the forecast predictions.
         """
         with torch.no_grad():
-            pred = self(x)
+            pred = self(x)[0]
 
         return {"pred": pred}
 
-    def compute_combined_projection_feature(self, x):
+ 
+
+    def lasso_penalty(self, layer, lambda_lasso):
         """
-        Get combined projection MLPForecastNetwork.
+        Computes the Lasso penalty for the given layer.
 
         Args:
-            x (torch.Tensor): Input tensor.
+            layer (nn.Module): The layer to compute the penalty for.
+            lambda_lasso (float): The Lasso penalty coefficient.
 
         Returns:
-            torch.Tensor: Output tensor after processing through the network.
+            float: The computed Lasso penalty.
         """
-        f = self.encoder(x[:, : self.input_window_size, :])
-
-        if self.n_covariates > 0:
-            h = self.horizon(x[:, self.input_window_size :, self.n_unknown :])
-            if self.combination_type == "attn-comb":
-                ph_hf = self.attention(h.unsqueeze(0), f.unsqueeze(0), f.unsqueeze(0))[
-                    0
-                ].squeeze(0)
-            elif self.combination_type == "weighted-comb":
-                gate = self.gate(torch.cat((h, f), -1)).sigmoid()
-                ph_hf = (1 - gate) * f + gate * h
-            else:
-                ph_hf = h + f
-        else:
-            ph_hf = f
-
-        z = self.decoder(ph_hf)
-        return z
-
-
+        l1_norm = sum(torch.sum(torch.abs(param)) for param in layer.parameters())
+        return lambda_lasso * l1_norm
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -693,11 +679,26 @@ class MLPGAMForecastNetwork(nn.Module):
         -------
             torch.Tensor: Output tensor after processing through the network.
         """
-        ph_hf = self.compute_combined_projection_feature(x)
-        z = self.decoder(ph_hf)
-        loc = self.out_activation(self.mu(z).reshape(z.size(0), self.forecast_horizon, self.n_out))
+        # Process past features
+        past_features = self.encoder(x[:, :self.input_window_size, :])
+        past_features_transformed = self.past_feature_transform(past_features)
 
-        return loc
+        if self.n_covariates > 0:
+            # Process future features
+            future_features = self.horizon(x[:, self.input_window_size:, self.n_unknown:])
+            future_features_transformed = self.future_feature_transform(future_features)
+        
+            # Combine past and future feature outputs
+            combined_output = self.bias + past_features_transformed + future_features_transformed
+            combined_output = self.out_activation(combined_output.reshape(x.size(0), self.forecast_horizon, self.n_out))
+            past_features_transformed=past_features_transformed.reshape(x.size(0), self.forecast_horizon, self.n_out)
+            future_features_transformed=future_features_transformed.reshape(x.size(0), self.forecast_horizon, self.n_out)
+            return combined_output, past_features_transformed, future_features_transformed
+        else:
+            combined_output = self.bias + past_features_transformed
+            combined_output = self.out_activation(combined_output.reshape(x.size(0), self.forecast_horizon, self.n_out))
+            past_features_transformed=past_features_transformed.reshape(x.size(0), self.forecast_horizon, self.n_out)
+            return combined_output, past_features_transformed
 
 
     def step(self, batch: tuple, metric_fn: callable) -> tuple:
@@ -714,14 +715,28 @@ class MLPGAMForecastNetwork(nn.Module):
         """
         x, y = batch
 
-        y_pred = self(x)
+        if self.n_covariates > 0:
+            loc, past_loc, future_loc = self(x)
+            loss_3 = (
+            self.alpha * F.mse_loss(future_loc, y, reduction="none").sum(dim=(1, 2)).mean()
+            + (1 - self.alpha) * F.l1_loss(future_loc, y, reduction="none").sum(dim=(1, 2)).mean())
+            loss_3+=self.lasso_penalty(self.future_feature_transform, self.alpha*1e-1)
+        else:
+            loc, past_loc = self(x)
+            loss_3=0.0
 
-        loss = (
-            self.alpha * F.mse_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
-            + (1 - self.alpha) * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
+        loss_1 = (
+            self.alpha * F.mse_loss(loc, y, reduction="none").sum(dim=(1, 2)).mean()
+            + (1 - self.alpha) * F.l1_loss(loc, y, reduction="none").sum(dim=(1, 2)).mean()
         )
+        loss_2 = (
+            self.alpha * F.mse_loss(past_loc, y, reduction="none").sum(dim=(1, 2)).mean()
+            + (1 - self.alpha) * F.l1_loss(past_loc, y, reduction="none").sum(dim=(1, 2)).mean()
+        )
+        loss_2+=self.lasso_penalty(self.past_feature_transform, self.alpha*1e-1)
 
-        metric = metric_fn(y_pred, y)
+        metric = metric_fn(loc, y)
+        loss = loss_1 + (loss_2 + loss_3)*self.alpha
 
         return loss, metric
 
