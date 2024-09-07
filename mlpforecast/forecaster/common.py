@@ -396,25 +396,11 @@ class PytorchForecast:
             "index": time_stamp,
             "targets": self.model.data_pipeline.target_series,
         })
-
-
-    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
-        """
-        Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
-
-        Args:
-            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
-            daily_feature (bool): Flag indicating whether daily features are used in the model. Default is True.
-
-        Returns:
-            results_df (pd.DataFrame): A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
-        """
-        if (test_df is not None) and (self.train_df is not None):
-            test_df = pd.concat([self.train_df, test_df], axis=0)
-        else:
-            assert ValueError("test_df can not be None")
-        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
-
+    
+    def get_ground_truth(self, 
+                       test_df=None,  
+                       daily_feature=True):
+        
         ground_truth = self.load_and_prepare_data(test_df, daily_feature)
         time_stamp = ground_truth[[self.model.data_pipeline.date_column]].values
         ground_truth = ground_truth[self.model.data_pipeline.target_series].values
@@ -433,6 +419,4 @@ class PytorchForecast:
         )
 
         return time_stamp, ground_truth
-        
 
-    
