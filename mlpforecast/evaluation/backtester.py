@@ -47,7 +47,6 @@ class TimeSeriesSplitter:
         _split_scheme : dict{split_meta}
             meta data of ways to split train and test set
         """
-
         self.df = df.copy()
         self.min_train_len = min_train_len
         self.incremental_len = incremental_len
@@ -84,11 +83,7 @@ class TimeSeriesSplitter:
 
         # if n_splits is specified, set min_train_len internally
         if self.n_splits:
-            self.min_train_len = (
-                self._full_len
-                - self.forecast_len
-                - (self.n_splits - 1) * self.incremental_len
-            )
+            self.min_train_len = self._full_len - self.forecast_len - (self.n_splits - 1) * self.incremental_len
 
     def _validate_params(self):
         if self.min_train_len is None and self.n_splits is None:
@@ -113,7 +108,7 @@ class TimeSeriesSplitter:
                 raise ValueError("date_col not found in df provided.")
 
     def _set_split_scheme(self):
-        """set meta data of ways to split train and test set"""
+        """Set meta data of ways to split train and test set"""
         test_end_min = self.min_train_len - 1
         test_end_max = self._full_len - self.forecast_len
         test_seq = range(test_end_min, test_end_max, self.incremental_len)
@@ -121,15 +116,9 @@ class TimeSeriesSplitter:
         split_scheme = {}
         for i, train_end_idx in enumerate(test_seq):
             split_scheme[i] = {}
-            train_start_idx = (
-                train_end_idx - self.min_train_len + 1
-                if self.window_type == "rolling"
-                else 0
-            )
+            train_start_idx = train_end_idx - self.min_train_len + 1 if self.window_type == "rolling" else 0
             split_scheme[i]["train_idx"] = range(train_start_idx, train_end_idx + 1)
-            split_scheme[i]["test_idx"] = range(
-                train_end_idx + 1, train_end_idx + self.forecast_len + 1
-            )
+            split_scheme[i]["test_idx"] = range(train_end_idx + 1, train_end_idx + self.forecast_len + 1)
 
             if self.date_col is not None:
                 split_scheme[i]["train_period"] = (
@@ -192,15 +181,9 @@ class BacktestingForecast:
         n_sample_per_day: int = 48,
         date_column="timestamp",
     ):
-        min_train_len = int(
-            n_sample_per_day * 30 * min_train_len
-        )  # minimal length of window length
-        forecast_len = int(
-            n_sample_per_day * 30 * forecast_len
-        )  # length forecast window
-        incremental_len = int(
-            n_sample_per_day * 30 * incremental_len
-        )  # step length for moving forward)
+        min_train_len = int(n_sample_per_day * 30 * min_train_len)  # minimal length of window length
+        forecast_len = int(n_sample_per_day * 30 * forecast_len)  # length forecast window
+        incremental_len = int(n_sample_per_day * 30 * incremental_len)  # step length for moving forward)
         self.date_column = date_column
         self.generator = partial(
             TimeSeriesSplitter,

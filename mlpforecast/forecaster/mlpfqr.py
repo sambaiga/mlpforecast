@@ -6,27 +6,17 @@ import numpy as np
 import pandas as pd
 import optuna
 from optuna import Trial
-
+from timeit import default_timer
 from mlpforecast.forecaster.common import PytorchForecast
 from mlpforecast.forecaster.utils import get_latest_checkpoint
-from mlpforecast.model.deterministic import MLPForecastModel
+from mlpforecast.evaluation.metrics import evaluate_quantile_forecast
+from mlpforecast.model.quantile import MLPFQRForecastModel
 from mlpforecast.net.layers import ACTIVATIONS
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("MLPF")
+logger = logging.getLogger("MLPFQR")
 
-
-class MLPForecast(PytorchForecast):
-    """
-    MLP Forecasting class for managing training, evaluation, and prediction.
-
-    Attributes:
-        hparams (dict): Hyperparameters for the MLP model.
-        model (MLPForecastModel): PyTorch model.
-        train_df (pd.DataFrame): Training DataFrame.
-        validation_df (pd.DataFrame): Validation DataFrame.
-    """
-    
+class MLPFQRForecast(PytorchForecast):
     def __init__(
         self,
         hparams: dict,
@@ -72,7 +62,7 @@ class MLPForecast(PytorchForecast):
             rich_progress_bar=rich_progress_bar,
         )
         self.hparams = hparams
-        self.model = MLPForecastModel(**hparams)
+        self.model = MLPFQRForecastModel(**hparams)
 
     def load_checkpoint(self):
         """
@@ -81,8 +71,87 @@ class MLPForecast(PytorchForecast):
         This method retrieves the path of the latest checkpoint and loads the model from it.
         """
         path_best_model = get_latest_checkpoint(self.checkpoints)
-        self.model = MLPForecastModel.load_from_checkpoint(path_best_model)
+        self.model = MLPFQRForecastModel.load_from_checkpoint(path_best_model)
         self.model.eval()
+
+    def forecast(self, test_df=None, covariate_df=None, daily_feature=True):
+        if test_df is not None:
+            test_df = pd.concat([self.train_df, test_df], axis=0)
+        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
+
+        # Inverse transform predictions
+        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
+        target_scaler = scaler.named_transformers_["target_scaler"]
+
+        pred=self.perform_prediction(test_df=test_df)
+
+        N, T, C = pred["loc"].size()
+        pred["loc"] = target_scaler.inverse_transform(pred["loc"].numpy().reshape(N * T, C))
+        pred["loc"] = pred["loc"].reshape(N, T, C)
+
+        N, B,  T, C = pred['q_samples'].shape
+        pred['q_samples']=target_scaler.inverse_transform(pred["q_samples"].numpy().reshape(N*B*T, C))
+        pred['q_samples']=pred['q_samples'].reshape(N, B,T, C)
+        return pred
+
+    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
+        """
+        Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
+
+        Args:
+            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
+            daily_feature (bool): Flag indicating whether daily features are used in the model. Default is True.
+
+        Returns
+        -------
+            pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
+        """
+        pred=self.forecast(test_df, covariate_df, daily_feature)
+        if test_df is not None:
+            test_df = pd.concat([self.train_df, test_df], axis=0)
+        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
+
+        time_stamp, ground_truth = self.get_ground_truth(test_df=test_df, 
+                                                         daily_feature=daily_feature)
+
+        
+        if pred["loc"].shape != ground_truth.shape:
+            raise ValueError("Shape mismatch: pred['pred'] and ground_truth must have the same shape.")
+        
+        # Create results DataFrame
+        results_df = self.create_results_df(
+            time_stamp,
+            ground_truth,
+            pred,
+            self.model.data_pipeline.target_series,
+            self.model.data_pipeline.date_column,
+        )
+        results_df["Model"] = self.model_type.upper()
+
+        # Evaluate point forecast
+        pred.update({"true": ground_truth,
+                "index": time_stamp,
+                "targets": self.model.data_pipeline.target_series,})
+        self.metrics = evaluate_quantile_forecast(outputs=pred, 
+                                                  alpha=self.model.hparams['alpha'])
+        self.metrics["test-time"] = self.test_walltime
+        self.metrics["Model"] = self.model_type.upper()
+
+        return results_df
+
+    def create_results_df(self, time_stamp, ground_truth, predictions, target_series, date_column):
+        """Creates a DataFrame with the timestamp index and populates it with ground truth and forecasted values."""
+        results_df = pd.DataFrame(index=pd.to_datetime(time_stamp.flatten(), unit="ns"))
+        results_df.index.name = date_column
+
+        for target_idx, target_name in enumerate(target_series):
+            results_df[target_name] = ground_truth[:, :, target_idx].flatten()
+            results_df[f"{target_name}_forecast"] = predictions['loc'][:, :, target_idx].flatten()
+            #results_df[f"{target_name}_q_samples"] = predictions['q_samples'][:, :, target_idx]
+            #results_df[f"{target_name}_taus"] = predictions['taus_hats'][:, :, target_idx].squeeze().numpy()
+        
+        return results_df
+    
 
     def get_search_params(self, trial: Trial) -> dict:
         """
@@ -102,6 +171,7 @@ class MLPForecast(PytorchForecast):
         params["hidden_size"] = trial.suggest_int("hidden_size", 8, 512, step=2)
         params["num_layers"] = trial.suggest_int("num_layers", 1, 5)
         params["expansion_factor"] = trial.suggest_int("expansion_factor", 1, 4)
+        params["N"] = trial.suggest_int("N", 10, 100)
 
         # Define categorical hyperparameters
         params["embedding_type"] = trial.suggest_categorical(
@@ -114,7 +184,9 @@ class MLPForecast(PytorchForecast):
 
         # Define float hyperparameters
         params["dropout_rate"] = trial.suggest_float("dropout_rate", 0.0, 0.9, step=0.05)
-        params["alpha"] = trial.suggest_float("alpha", 1e-3, 1.0, log=True)
+        params["kappa"] = trial.suggest_float("kappa", 1e-3, 1, log=True)
+        params["eps"] = trial.suggest_float("eps", 1e-6, 1e-3, log=True)
+        params["alpha"] = trial.suggest_float("alpha", 1e-3, 1.0,log=True)
 
         return params
 
@@ -123,11 +195,8 @@ class MLPForecast(PytorchForecast):
         Perform hyperparameter tuning using Optuna.
 
         Args:
-            train_df (pd.DataFrame): Training DataFrame.
-            val_df (pd.DataFrame): Validation DataFrame.
-            num_trial (int, optional): Number of trials for hyperparameter optimization. Defaults to 10.
-            reduction_factor (int, optional): Reduction factor for Hyperband pruner. Defaults to 3.
-            patience (int, optional): Patience for the Patient pruner. Defaults to
+            train_df: Training DataFrame.
+            val_df: Validation DataFrame.
         """
         self.train_df = train_df
         self.validation_df = val_df
@@ -140,7 +209,7 @@ class MLPForecast(PytorchForecast):
             params = self.get_search_params(trial)
 
             self.hparams.update(params)
-            model = MLPForecast(
+            model = MLPFQRForecast(
                 self.hparams,
                 exp_name=f"{self.exp_name}",
                 seed=42,
@@ -172,64 +241,3 @@ class MLPForecast(PytorchForecast):
         )
         self.hparams.update(study.best_trial.params)
         np.save(f"{self.results_path}/best_params.npy", study.best_trial.params)
-
-
-    def forecast(self, test_df=None, covariate_df=None, daily_feature=True):
-        if test_df is not None:
-            test_df = pd.concat([self.train_df, test_df], axis=0)
-        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
-
-        # Inverse transform predictions
-        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
-        target_scaler = scaler.named_transformers_["target_scaler"]
-
-        pred=self.perform_prediction(test_df=test_df)
-        N, T, C = pred["pred"].size()
-        pred["pred"] = target_scaler.inverse_transform(pred["pred"].numpy().reshape(N * T, C))
-        pred["pred"] = pred["pred"].reshape(N, T, C)
-        return pred
-
-    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
-        """
-        Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
-
-        Args:
-            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
-            daily_feature (bool): Flag indicating whether daily features are used in the model. Default is True.
-
-        Returns
-        -------
-            pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
-        """
-        pred=self.forecast(test_df, covariate_df, daily_feature)
-        
-        if test_df is not None:
-            test_df = pd.concat([self.train_df, test_df], axis=0)
-        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
-
-        time_stamp, ground_truth = self.get_ground_truth(test_df=test_df, 
-                                                         daily_feature=daily_feature)
-
-        # Assert that the prediction and ground truth shapes are the same
-        if pred["pred"].shape != ground_truth.shape:
-            raise ValueError("Shape mismatch: pred['pred'] and ground_truth must have the same shape.")
-      
-
-        # Evaluate point forecast
-        self.metrics = self.evaluate_point_forecast(ground_truth, pred["pred"], time_stamp)
-        self.metrics["test-time"] = self.test_walltime
-        self.metrics["Model"] = self.model_type.upper()
-
-        
-        # Create results DataFrame
-        results_df = self.create_results_df(
-            time_stamp,
-            ground_truth,
-            pred["pred"],
-            self.model.data_pipeline.target_series,
-            self.model.data_pipeline.date_column,
-        )
-        results_df["Model"] = self.model_type.upper()
-
-        return results_df
-

@@ -11,11 +11,13 @@ class TimeSeriesDataset(torch.utils.data.Dataset):
     tensors. It provides the necessary methods to retrieve the length of the dataset
     and individual data points.
 
-    Parameters:
+    Parameters
+    ----------
     - inputs (np.array): A numpy array of input features. Expected shape is (num_samples, num_features).
     - targets (np.array): A numpy array of target values. Expected shape is (num_samples, target_dim).
 
-    Methods:
+    Methods
+    -------
     - __len__(): Returns the number of samples in the dataset.
     - __getitem__(index): Returns the input features and target for a given index.
 
@@ -24,7 +26,8 @@ class TimeSeriesDataset(torch.utils.data.Dataset):
     >>> len(dataset)
     >>> features, target = dataset[index]
 
-    Attributes:
+    Attributes
+    ----------
     - inputs (torch.FloatTensor): The input features stored as a PyTorch FloatTensor.
     - targets (torch.FloatTensor): The target values stored as a PyTorch FloatTensor.
     """
@@ -53,7 +56,8 @@ class TimeseriesDataModule(pl.LightningDataModule):
 
     This DataModule prepares the data loaders for training and validation datasets.
 
-    Parameters:
+    Parameters
+    ----------
     - train_inputs (np.array): A numpy array of training input features.
     - train_targets (np.array): A numpy array of training target values.
     - val_inputs (np.array, optional): A numpy array of validation input features. Default is None.
@@ -63,7 +67,8 @@ class TimeseriesDataModule(pl.LightningDataModule):
     - batch_size (int, optional): Number of samples per batch to load. Default is 64.
     - pin_memory (bool, optional): Whether to pin memory during data loading. Default is True.
 
-    Methods:
+    Methods
+    -------
     - train_dataloader(): Returns the DataLoader for the training dataset.
     - val_dataloader(): Returns the DataLoader for the validation dataset if it exists, otherwise returns None.
     """
@@ -80,9 +85,7 @@ class TimeseriesDataModule(pl.LightningDataModule):
         pin_memory: bool = True,
     ):
         super().__init__()
-        self.train_dataset = TimeSeriesDataset(
-            inputs=train_inputs, targets=train_targets
-        )
+        self.train_dataset = TimeSeriesDataset(inputs=train_inputs, targets=train_targets)
 
         if val_inputs is not None:
             self.val_dataset = TimeSeriesDataset(inputs=val_inputs, targets=val_targets)

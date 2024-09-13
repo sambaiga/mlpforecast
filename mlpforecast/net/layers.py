@@ -25,13 +25,13 @@ def create_linear(in_channels, out_channels, bn=False):
     """
     Creates a linear layer with optional batch normalization.
 
-    Parameters:
+    Args:
         in_channels (int): Number of input channels.
         out_channels (int): Number of output channels.
         bn (bool, optional): If True, adds batch normalization. Defaults to False.
 
     Returns:
-        nn.Module: Linear layer with optional batch normalization.
+        (nn.Module): Linear layer with optional batch normalization.
     """
     # Create a linear layer
     m = nn.Linear(in_channels, out_channels)
@@ -54,19 +54,19 @@ def create_linear(in_channels, out_channels, bn=False):
     return m
 
 
-def FeedForward(dim, expansion_factor=2, dropout=0.0, activation=nn.GELU(), bn=True):
+def FeedForward(dim: int, expansion_factor: int, dropout: float, activation: torch.nn.Module, bn=True):
     """
     Creates a feedforward block composed of linear layers, activation function, and dropout.
 
-    Parameters:
+    Args:
         dim (int): Dimensionality of the input.
         expansion_factor (int, optional): Expansion factor for the intermediate hidden layer. Defaults to 2.
-        dropout (float, optional): Dropout probability. Defaults to 0.0 (no dropout).
-        activation (torch.nn.Module, optional): Activation function. Defaults to GELU().
+        dropout (float, optional): Dropout probability.
+        activation (torch.nn.Module, optional): Activation function.
         bn (bool, optional): If True, adds batch normalization. Defaults to True.
 
     Returns:
-        nn.Sequential: Feedforward block.
+        (nn.Sequential): Feedforward block.
     """
     # Create a sequential block with linear layer, activation, and dropout
     block = nn.Sequential(
@@ -81,6 +81,16 @@ def FeedForward(dim, expansion_factor=2, dropout=0.0, activation=nn.GELU(), bn=T
 
 
 class MLPBlock(nn.Module):
+    """
+    Multi-Layer Perceptron (MLP) block with configurable layers and options.
+
+    Attributes:
+        mlp_network (nn.ModuleList): List of layers in the MLP network.
+        in_size (int): Size of the input after flattening.
+        context_size (int): Size of the context.
+        residual (bool): If True, adds residual connections.
+    """
+
     def __init__(
         self,
         in_size=1,
@@ -96,7 +106,8 @@ class MLPBlock(nn.Module):
         """
         Multi-Layer Perceptron (MLP) block with configurable layers and options.
 
-        Parameters:
+        Parameters
+        ----------
             in_size (int, optional): Size of the input. Defaults to 1.
             latent_dim (int, optional): Dimensionality of the latent space. Defaults to 32.
             features_start (int, optional): Number of features in the initial layer. Defaults to 16.
@@ -124,18 +135,12 @@ class MLPBlock(nn.Module):
         feats = features_start
 
         # Create the specified number of layers in the MLP
-        for i in range(num_layers - 1):
-            layers.append(
-                nn.Sequential(
-                    create_linear(feats, feats * expansion_factor, bn=bn), activation
-                )
-            )
+        for _ in range(num_layers - 1):
+            layers.append(nn.Sequential(create_linear(feats, feats * expansion_factor, bn=bn), activation))
             feats = feats * expansion_factor
 
         # Add the final layer with latent_dim and activation, without batch normalization
-        layers.append(
-            nn.Sequential(create_linear(feats, latent_dim, bn=False), activation)
-        )
+        layers.append(nn.Sequential(create_linear(feats, latent_dim, bn=False), activation))
 
         # Create a ModuleList to store the layers
         self.mlp_network = nn.ModuleList(layers)
@@ -144,11 +149,12 @@ class MLPBlock(nn.Module):
         """
         Forward pass of the MLP block.
 
-        Parameters:
+        Parameters
+        ----------
             x (torch.Tensor): Input tensor.
 
         Returns:
-            torch.Tensor: Output tensor after passing through the MLP block.
+            (torch.Tensor): Output tensor after passing through the MLP block.
         """
         # Flatten the input along dimensions 1 and 2
         if x.ndim == 3:
@@ -167,6 +173,19 @@ class MLPBlock(nn.Module):
 
 
 class PastFutureEncoder(nn.Module):
+    """
+    Encoder module for the PastFutureNetwork.
+
+    Attributes:
+        encoder (MLPBlock): MLP block for the encoder.
+        norm (nn.LayerNorm): Layer normalization.
+        dropout (nn.Dropout): Dropout layer.
+        embedding (nn.Module): Embedding layer.
+        embedding_type (str): Type of embedding to use.
+        rotary_embedding (RotaryEmbedding): Rotary positional embedding.
+        pos_embedding (PosEmbedding): Positional embedding.
+    """
+
     def __init__(
         self,
         embedding_size: int = 28,
@@ -181,20 +200,19 @@ class PastFutureEncoder(nn.Module):
         n_channels: int = 1,
     ):
         """
-        Encoder module for processing past sequences.
+        Initializes the PastFutureEncoder module.
 
         Args:
             embedding_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
-            embedding_type (str, optional): Type of embedding to use. \
-                Defaults to None. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'.
+            embedding_type (str, optional): Type of embedding to use. Defaults to None.
             latent_size (int, optional): Dimensionality of the latent space. Defaults to 64.
-            num_layers (int, optional): Number of layers in the MLP. Defaults to 2.
-            residual (bool, optional): Whether to use residual connections in the MLP. Defaults to False.
-            expansion_factor (int, optional): Expansion factor for the MLP. Defaults to 2.
-            context_size (int, optional): Size of the input context window. Defaults to 96.
+            num_layers (int, optional): Number of layers in the encoder. Defaults to 2.
+            residual (bool, optional): Whether to use residual connections in the encoder. Defaults to False.
+            expansion_factor (int, optional): Expansion factor for the encoder. Defaults to 2.
+            context_size (int, optional): Size of the context. Defaults to 96.
             activation (nn.Module, optional): Activation function. Defaults to nn.ReLU().
             dropout_rate (float, optional): Dropout probability. Defaults to 0.25.
-            n_channels (int, optional): Number of input channels. Defaults to 1.
+            n_channels (int, optional): Number of channels in the input. Defaults
         """
         super().__init__()
 
@@ -220,15 +238,11 @@ class PastFutureEncoder(nn.Module):
 
         # Embedding based on the specified type
         if embedding_type == "PosEmb":
-            self.embedding = PosEmbedding(
-                n_channels, embedding_size, window_size=context_size
-            )
+            self.embedding = PosEmbedding(n_channels, embedding_size, window_size=context_size)
         elif embedding_type == "RotaryEmb":
             self.embedding = RotaryEmbedding(embedding_size)
         elif embedding_type == "CombinedEmb":
-            self.pos_embedding = PosEmbedding(
-                n_channels, embedding_size, window_size=context_size
-            )
+            self.pos_embedding = PosEmbedding(n_channels, embedding_size, window_size=context_size)
             self.rotary_embedding = RotaryEmbedding(embedding_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -238,7 +252,8 @@ class PastFutureEncoder(nn.Module):
         Args:
             x (torch.Tensor): Input tensor.
 
-        Returns:
+        Returns
+        -------
             torch.Tensor: Output tensor after processing through the encoder.
         """
         # Normalize the input
@@ -261,6 +276,28 @@ class PastFutureEncoder(nn.Module):
 
 
 class MLPForecastNetwork(nn.Module):
+    """
+    Multilayer Perceptron (MLP) Forecast Network for time series forecasting.
+
+    Attributes:
+        n_out (int): Number of target series.
+        n_unknown (int): Number of unknown time-varying features.
+        n_covariates (int): Number of known time-varying features.
+        n_channels (int): Number of channels in the input.
+        input_window_size (int): Size of the input window.
+        forecast_horizon (int): Number of future time steps to forecast.
+        out_activation (torch.nn.Module): Output activation function.
+        activation (torch.nn.Module): Activation function.
+        encoder (PastFutureEncoder): Encoder module.
+        horizon (PastFutureEncoder): Horizon encoder module.
+        combination_type (str): Type of combination to use.
+        alpha (float): Alpha parameter for the loss.
+        attention (nn.MultiheadAttention): Multi-head attention module.
+        gate (nn.Linear): Linear layer for weighted combination.
+        decoder (nn.Sequential): Decoder module.
+        mu (nn.Linear): Linear layer for output.
+    """
+
     def __init__(
         self,
         n_target_series: int,
@@ -290,12 +327,9 @@ class MLPForecastNetwork(nn.Module):
             n_unknown_features (int): Number of unknown time-varying features.
             n_known_calendar_features (int): Number of known categorical time-varying features.
             n_known_continuous_features (int): Number of known continuous time-varying features.
-            embedding_size (int, optional): Dimensionality of the embedding space. \
-            Defaults to 28.
-            embedding_type (str, optional): Type of embedding to use. \
-                Defaults to None. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'.
-            combination_type (str, optional): Type of combination to use.\
-                  Defaults to 'attn-comb'. Options: 'attn-comb', 'weighted-comb', 'addition-comb'.
+            embedding_size (int, optional): Dimensionality of the embedding space. Defaults to 28.
+            embedding_type (str, optional): Type of embedding to use. Defaults to None. Options: 'PosEmb', 'RotaryEmb', 'CombinedEmb'.
+            combination_type (str, optional): Type of combination to use.Defaults to 'attn-comb'. Options: 'attn-comb', 'weighted-comb', 'addition-comb'.
             expansion_factor (int, optional): Expansion factor for the encoder. Defaults to 2.
             residual (bool, optional): Whether to use residual connections in the encoder. Defaults to False.
             hidden_size (int, optional): Dimensionality of the hidden layers. Defaults to 256.
@@ -311,21 +345,15 @@ class MLPForecastNetwork(nn.Module):
         super().__init__()
 
         # Ensure valid activation and embedding types
-        assert (
-            activation_function in ACTIVATIONS
-        ), f"Invalid activation_function. Please select from: {ACTIVATIONS}"
-        assert (
-            out_activation_function in ACTIVATIONS
-        ), f"Invalid out_activation_function. Please select from: {ACTIVATIONS}"
-        assert (
-            embedding_type
-            in [
-                None,
-                "PosEmb",
-                "RotaryEmb",
-                "CombinedEmb",
-            ]
-        ), "Invalid embedding type, choose from: None, 'PosEmb', 'RotaryEmb', 'CombinedEmb'"
+        if activation_function not in ACTIVATIONS:
+            raise ValueError(f"Invalid activation_function. Please select from: {ACTIVATIONS}")
+
+        if out_activation_function not in ACTIVATIONS:
+            raise ValueError(f"Invalid out_activation_function. Please select from: {ACTIVATIONS}")
+
+        valid_embedding_types = [None, "PosEmb", "RotaryEmb", "CombinedEmb"]
+        if embedding_type not in valid_embedding_types:
+            raise ValueError(f"Invalid embedding type, choose from: {valid_embedding_types}")
 
         self.n_out = n_target_series
         self.n_unknown = n_unknown_features + self.n_out
@@ -366,19 +394,12 @@ class MLPForecastNetwork(nn.Module):
         self.combination_type = combination_type
         self.alpha = alpha
 
-        assert (
-            combination_type
-            in [
-                "attn-comb",
-                "weighted-comb",
-                "addition-comb",
-            ]
-        ), "Invalid combination type, choose from: 'attn-comb', 'weighted-comb', 'addition-comb'"
+        valid_combination_types = ["attn-comb", "weighted-comb", "addition-comb"]
+        if combination_type not in valid_combination_types:
+            raise ValueError(f"Invalid combination type, choose from: {valid_combination_types}")
 
         if combination_type == "attn-comb":
-            self.attention = nn.MultiheadAttention(
-                hidden_size, num_attention_heads, dropout=dropout_rate
-            )
+            self.attention = nn.MultiheadAttention(hidden_size, num_attention_heads, dropout=dropout_rate)
 
         if combination_type == "weighted-comb":
             self.gate = nn.Linear(2 * hidden_size, hidden_size)
@@ -395,6 +416,7 @@ class MLPForecastNetwork(nn.Module):
 
         self.mu = nn.Linear(hidden_size, self.n_out * forecast_horizon)
 
+
     def forecast(self, x: torch.Tensor) -> dict:
         """
         Generates forecasts for the input sequences.
@@ -402,7 +424,8 @@ class MLPForecastNetwork(nn.Module):
         Args:
             x (torch.Tensor): Input tensor.
 
-        Returns:
+        Returns
+        -------
             dict: Dictionary containing the forecast predictions.
         """
         with torch.no_grad():
@@ -410,9 +433,9 @@ class MLPForecastNetwork(nn.Module):
 
         return {"pred": pred}
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def compute_combined_projection_feature(self, x):
         """
-        Forward pass of the MLPForecastNetwork.
+        Get combined projection MLPForecastNetwork.
 
         Args:
             x (torch.Tensor): Input tensor.
@@ -437,11 +460,27 @@ class MLPForecastNetwork(nn.Module):
             ph_hf = f
 
         z = self.decoder(ph_hf)
-        loc = self.out_activation(
-            self.mu(z).reshape(z.size(0), self.forecast_horizon, self.n_out)
-        )
+        return z
+
+
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the MLPForecastNetwork.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns
+        -------
+            torch.Tensor: Output tensor after processing through the network.
+        """
+        ph_hf = self.compute_combined_projection_feature(x)
+        z = self.decoder(ph_hf)
+        loc = self.out_activation(self.mu(z).reshape(z.size(0), self.forecast_horizon, self.n_out))
 
         return loc
+
 
     def step(self, batch: tuple, metric_fn: callable) -> tuple:
         """
@@ -451,7 +490,8 @@ class MLPForecastNetwork(nn.Module):
             batch (tuple): Tuple containing input and target tensors.
             metric_fn (callable): Metric function to evaluate.
 
-        Returns:
+        Returns
+        -------
             tuple: Tuple containing the loss and computed metric.
         """
         x, y = batch
@@ -460,8 +500,7 @@ class MLPForecastNetwork(nn.Module):
 
         loss = (
             self.alpha * F.mse_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
-            + (1 - self.alpha)
-            * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
+            + (1 - self.alpha) * F.l1_loss(y_pred, y, reduction="none").sum(dim=(1, 2)).mean()
         )
 
         metric = metric_fn(y_pred, y)
