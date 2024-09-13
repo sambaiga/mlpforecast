@@ -1,7 +1,7 @@
 default_language_version:
   python: python3
 
-
+exclude: ^(poetry.lock|.idea/)
 
 # general checks (see here: https://pre-commit.com/hooks.html)
 repos:
@@ -13,47 +13,49 @@ repos:
      # - id: poetry-export
      # - id: poetry-install
 
-
-  - repo: https://github.com/mxr/sync-pre-commit-deps
-    rev: v0.0.1
-    hooks:
-      - id: sync-pre-commit-deps
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.5
+    rev: v0.4.6
     hooks:
       - id: ruff
         args: ["--fix"]
       - id: ruff-format
       - id: ruff
 
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
       - id: check-yaml
       - id: check-added-large-files
+      - id: check-docstring-first
+      - id: check-shebang-scripts-are-executable
+      - id: check-merge-conflict
       - id: check-json
       - id: check-ast
         exclude: .vscode
       - id: check-case-conflict
       - id: detect-private-key
       - id: check-toml
-      - id: check-docstring-first
       - id: debug-statements
       - id: end-of-file-fixer
+        exclude: ^LICENSE|\.(html|csv|txt|svg|py)$
       - id: mixed-line-ending
-      - id: trailing-whitespace  # Corrected indentation here
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: \.(html|svg)$
+      - id: check-xml
+      - id: destroyed-symlinks
+      - id: pretty-format-json
+        args: ["--autofix", "--no-ensure-ascii", "--no-sort-keys"]
+      - id: requirements-txt-fixer
 
 
-
-  #- repo: https://github.com/codespell-project/codespell
-  #  rev: v2.2.6
-  #  hooks:
-  #    - id: codespell
-  #     language: python
-  #     exclude: 'poetry.lock'  # Exclude the poetry.lock file
-
-
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        additional_dependencies:
+          - tomli
 
   # Sorts Python imports according to the defined style
   - repo: https://github.com/pycqa/isort
@@ -63,24 +65,9 @@ repos:
         args: ["--profile", "black"]
 
 
-  - repo: https://github.com/pycqa/autoflake
-    rev: v2.3.1
-    hooks:
-      - id: autoflake
 
 
-  # flake8 formatting
-  #- repo: https://github.com/pycqa/flake8
-  #  rev: 7.1.0
-  # hooks:
-  #    - id: flake8
-        #args:
-        #  - "--max-line-length=128"
 
-  #- repo: https://github.com/hhatto/autopep8
-  #  rev: v2.3.1  # select the tag or revision you want, or run `pre-commit autoupdate`
-  #  hooks:
-  #    - id: autopep8
 
 
 
@@ -97,15 +84,8 @@ repos:
       - id: pyupgrade
         args: [--py311-plus]
 
-  # Automatically removes unnecessary # noqa comments
-  - repo: https://github.com/asottile/yesqa
-    rev: v1.5.0
-    hooks:
-      - id: yesqa
-        additional_dependencies: &flake8_deps
-          - flake8-bugbear==22.8.23
-          - flake8-comprehensions==3.10.0
-          - flake8-docstrings==1.6.0
+
+
 
   # Removes all unused import statements
   - repo: https://github.com/hadialqattan/pycln
@@ -121,6 +101,8 @@ repos:
       - id: commitizen
       - id: commitizen-branch
         stages: [push]
+
+
 
   # Performs commit message validation.
   - repo: https://github.com/pre-commit/pre-commit-hooks

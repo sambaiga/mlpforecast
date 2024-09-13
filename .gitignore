@@ -88,6 +88,7 @@ instance/
 
 # Scrapy stuff:
 .scrapy
+.lock
 
 # Sphinx documentation
 docs/_build/
