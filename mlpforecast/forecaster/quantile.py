@@ -6,16 +6,17 @@ import numpy as np
 import pandas as pd
 import optuna
 from optuna import Trial
-
+from timeit import default_timer
 from mlpforecast.forecaster.common import PytorchForecast
 from mlpforecast.forecaster.utils import get_latest_checkpoint
-from mlpforecast.model.quantile import MLPQRForecastModel
+from mlpforecast.evaluation.metrics import evaluate_quantile_forecast
+from mlpforecast.model.quantile import MLPFQRForecastModel, MLPQRForecastModel
 from mlpforecast.net.layers import ACTIVATIONS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPFQR")
 
-class MLPQRForecast(PytorchForecast):
+class MLPFQRForecast(PytorchForecast):
     def __init__(
         self,
         hparams: dict,
@@ -27,7 +28,7 @@ class MLPQRForecast(PytorchForecast):
         metric: str = "val_mae",
         max_epochs: int = 10,
         wandb: bool = False,
-        model_type: str = "MLPF",
+        model_type: str = 'MLPFPQR',
         gradient_clip_val: float = 10.0,
         rich_progress_bar: bool = True,
     ):
@@ -60,8 +61,13 @@ class MLPQRForecast(PytorchForecast):
             gradient_clip_val=gradient_clip_val,
             rich_progress_bar=rich_progress_bar,
         )
+        if model_type not in ['MLPFPQR', 'MLPFQR']:
+            raise ValueError("Specify correct model among 'MLPFPQR', 'MLPFQR'")
         self.hparams = hparams
-        self.model = MLPQRForecastModel(**hparams)
+        if model_type=='MLPFPQR':
+            self.model = MLPFQRForecastModel(**hparams)
+        if model_type=='MLPFQR':
+            self.model = MLPQRForecastModel(**hparams)
 
     def load_checkpoint(self):
         """
@@ -70,29 +76,104 @@ class MLPQRForecast(PytorchForecast):
         This method retrieves the path of the latest checkpoint and loads the model from it.
         """
         path_best_model = get_latest_checkpoint(self.checkpoints)
-        self.model = MLPQRForecastModel.load_from_checkpoint(path_best_model)
+        if self.model_type=='MLPFQR':
+            self.model = MLPFQRForecastModel.load_from_checkpoint(path_best_model)
+        else:
+            self.model = MLPQRForecastModel.load_from_checkpoint(path_best_model)
         self.model.eval()
 
-    
-    def forecast(self, test_df=None, covariate_df=None, daily_feature=True):
+    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
+        data_drop = self.model.data_pipeline.max_data_drop
+        input_window = self.model.data_pipeline.input_window_size
+        initial_test_df=self.train_df.iloc[-(data_drop + input_window) :].copy()
         if test_df is not None:
-            test_df = pd.concat([self.train_df, test_df], axis=0)
+            test_df = pd.concat([initial_test_df, test_df], axis=0)
+        else:
+            test_df = initial_test_df
         test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
 
-        # Inverse transform predictions
+        self.model.data_pipeline.daily_features=daily_feature
+        
+        features, _ = self.model.data_pipeline.transform(test_df.copy())
+        output=self.perform_prediction(features)
+        N, T, C = output["loc"].size()
+
         scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
         target_scaler = scaler.named_transformers_["target_scaler"]
+        output["loc"] = target_scaler.inverse_transform(output["loc"].numpy().reshape(N * T, C))
+        output["loc"] = output["loc"].reshape(N, T, C)
 
-        pred=self.perform_prediction(test_df=test_df)
+        N, B,  T, C = output['q_samples'].shape
+        output['q_samples']=target_scaler.inverse_transform(output["q_samples"].numpy().reshape(N*B*T, C))
+        output['q_samples']=output['q_samples'].reshape(N, B,T, C)
 
-        N, T, C = pred["loc"].size()
-        pred["loc"] = target_scaler.inverse_transform(pred["loc"].numpy().reshape(N * T, C))
-        pred["loc"] = pred["loc"].reshape(N, T, C)
+        return output
 
-        N, B,  T, C = pred['q_samples'].shape
-        pred['q_samples']=target_scaler.inverse_transform(pred["q_samples"].numpy().reshape(N*B*T, C))
-        pred['q_samples']=pred['q_samples'].reshape(N, B,T, C)
-        return pred
+    def evaluate(self, test_df=None, covariate_df=None, daily_feature=True):
+        """
+        Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
+
+        Args:
+            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
+            daily_feature (bool): Flag indicating whether daily features are used in the model. Default is True.
+
+        Returns
+        -------
+            pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
+        """
+        
+        
+        data_drop = self.model.data_pipeline.max_data_drop
+        input_window = self.model.data_pipeline.input_window_size
+        initial_test_df=self.train_df.iloc[-(data_drop + input_window) :].copy()
+        if test_df is not None:
+            test_df = pd.concat([initial_test_df, test_df], axis=0)
+        else:
+            test_df = initial_test_df
+        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
+
+        
+        features, _ = self.model.data_pipeline.transform(test_df.copy())
+        output=self.perform_prediction(features)
+        N, T, C = output["loc"].size()
+
+        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
+        target_scaler = scaler.named_transformers_["target_scaler"]
+        output["loc"] = target_scaler.inverse_transform(output["loc"].numpy().reshape(N * T, C))
+        output["loc"] = output["loc"].reshape(N, T, C)
+
+        time_stamp, ground_truth = self.get_ground_truth(test_df=test_df, 
+                                                         daily_feature=daily_feature)
+
+        # Assert that the prediction and ground truth shapes are the same
+        if output["loc"].shape != ground_truth.shape:
+            raise ValueError("Shape mismatch: pred['pred'] and ground_truth must have the same shape.")
+      
+
+     
+        # Evaluate  forecast
+        output.update({"true": ground_truth,
+                "index": time_stamp,
+                "targets": self.model.data_pipeline.target_series,})
+        metrics_df = evaluate_quantile_forecast(outputs=output, 
+                                                  alpha=self.model.hparams['alpha'])
+        metrics_df["test-time"] = self.test_walltime
+        metrics_df["Model"] = self.model_type.upper()
+
+        
+        # Create results DataFrame
+        results_df = self.create_results_df(
+            time_stamp,
+            ground_truth,
+            output["loc"],
+            self.model.data_pipeline.target_series,
+            self.model.data_pipeline.date_column,
+        )
+        results_df["Model"] = self.model_type.upper()
+
+        return results_df, metrics_df
+
+
 
     def get_search_params(self, trial: Trial) -> dict:
         """
@@ -150,7 +231,7 @@ class MLPQRForecast(PytorchForecast):
             params = self.get_search_params(trial)
 
             self.hparams.update(params)
-            model = MLPQRForecast(
+            model = MLPFQRForecast(
                 self.hparams,
                 exp_name=f"{self.exp_name}",
                 seed=42,

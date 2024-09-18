@@ -1,8 +1,7 @@
 import logging
 import torch
 from mlpforecast.model.base_model import BaseForecastModel
-from mlpforecast.net.fpqreg import MLPFQRForecastNetwork
-from mlpforecast.net.qreg import MLPQRForecastNetwork
+from mlpforecast.net.non_parametric_qr import MLPFQRForecastNetwork, MLPQRForecastNetwork
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPFQR")
 

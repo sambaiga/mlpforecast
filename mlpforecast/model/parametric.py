@@ -1,7 +1,7 @@
 import logging
 import torch
 from mlpforecast.model.base_model import BaseForecastModel
-from mlpforecast.net.parametric import MCDMultForecastNetwork, LaplaceForecastNetwork
+from mlpforecast.net.parametric import  LaplaceForecastNetwork
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLParametric")

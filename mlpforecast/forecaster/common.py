@@ -6,6 +6,7 @@ from timeit import default_timer
 
 import lightning as pl
 import pandas as pd
+import numpy as np
 import torch
 from lightning.pytorch import loggers
 from lightning.pytorch.callbacks import (
@@ -191,12 +192,11 @@ class PytorchForecast:
 
         self.trainer = pl.Trainer(
             logger=self.logger,
-            gradient_clip_val=self.gradient_clip_val,
+            #gradient_clip_val=self.gradient_clip_val, 
             max_epochs=self.max_epochs,
             callbacks=callback,
-            accelerator="cpu",
-            #accelerator="auto",
-            #devices=1,
+            accelerator="auto",
+            devices=1,
         )
 
 
@@ -255,6 +255,8 @@ class PytorchForecast:
             val_feature, val_target = None, None
             self.metric = f"train_{self.model.hparams['metric']}"
             self.train_df = pd.concat([train_df.copy(), val_df.copy()], axis=0)
+        
+        
         # Transform the training data into features and targets
         train_feature, train_target = self.model.data_pipeline.transform(train_df)
 
@@ -298,10 +300,9 @@ class PytorchForecast:
 
         if self.trial is not None:
             # Make predictions and compute the cost metric for hyper-param optimisation
-            self.predict(val_df)
-            cost = self.metrics.groupby("target")["MAE"].mean().iloc[-1].round(2)
-
-            return cost  # Return the computed cost metric
+            _, metrics=self.evaluate(val_df, daily_feature=False)
+            cost = metrics.groupby("target")["SMAPE(%)"].median().iloc[-1].round(2)
+            return cost
         else:
             return self.train_walltime
 
@@ -321,25 +322,26 @@ class PytorchForecast:
         self.model.data_pipeline.daily_features = daily_feature
 
         # Prepare ground truth data
-        ground_truth = test_df.iloc[self.model.data_pipeline.max_data_drop :].copy()
+        if self.train_df is not None:
+            ground_truth = test_df.iloc[self.model.data_pipeline.max_data_drop :].copy()
         ground_truth[self.model.data_pipeline.date_column] = pd.to_numeric(
             ground_truth[self.model.data_pipeline.date_column]
         )
         return ground_truth
 
 
-    def perform_prediction(self, test_df: pd.DataFrame):
+    def perform_prediction(self, features: np.array):
         """
         Performs the model prediction.
         
         Args:
-            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
+            features (np.array): numpy array containing the input features for prediction.
 
         Returns:
             (dict): A dictionary containing the forecasted values.
         
         """
-        features, _ = self.model.data_pipeline.transform(test_df.copy())
+        
         features = torch.FloatTensor(features.copy())
         self.model.to(features.device)
         self.model.eval()
@@ -347,6 +349,7 @@ class PytorchForecast:
         start_time = default_timer()
         output = self.model.forecast(features)
         self.test_walltime = default_timer() - start_time
+        
         return output
 
 
@@ -419,4 +422,72 @@ class PytorchForecast:
         )
 
         return time_stamp, ground_truth
+    
+    def format_test_df(self, test_df=None):
+        data_drop = self.model.data_pipeline.max_data_drop
+        input_window = self.model.data_pipeline.input_window_size
+        if self.train_df is not None:
+            initial_test_df=self.train_df.iloc[-(data_drop + input_window) :].copy()
+        elif test_df is not None and self.train_df is not None:
+            test_df = pd.concat([initial_test_df, test_df], axis=0)
+        elif test_df is  None and self.train_df is not None:
+            test_df = initial_test_df
+        else:
+            raise ValueError("You can not call prediction without specifying test-data")
+        test_df = test_df.sort_values(by=self.model.data_pipeline.date_column)
+        return test_df
+    
+    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
+        
+        
+        test_df = self.format_test_df(test_df)
+        self.model.data_pipeline.daily_features=daily_feature
+        features, _ = self.model.data_pipeline.transform(test_df.copy())
+        output=self.perform_prediction(features)
+        N, T, C = output["loc"].size()
+
+        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
+        target_scaler = scaler.named_transformers_["target_scaler"]
+        output["loc"] = target_scaler.inverse_transform(output["loc"].numpy().reshape(N * T, C))
+        output["loc"] = output["loc"].reshape(N, T, C)
+
+        return output
+
+    def evaluate(self, test_df=None, covariate_df=None, daily_feature=True):
+        """
+        Perform prediction on the test DataFrame and return a DataFrame with ground truth and forecasted values.
+
+        Args:
+            test_df (pd.DataFrame): The test DataFrame containing the input features for prediction.
+            daily_feature (bool): Flag indicating whether daily features are used in the model. Default is True.
+
+        Returns
+        -------
+            pd.DataFrame: A DataFrame containing the ground truth and forecasted values, indexed by timestamp.
+        """
+        output=self.predict(test_df, covariate_df, daily_feature) 
+        time_stamp, ground_truth = self.get_ground_truth(test_df=test_df, 
+                                                         daily_feature=daily_feature)
+        # Assert that the prediction and ground truth shapes are the same
+        if output["loc"].shape != ground_truth.shape:
+            raise ValueError("Shape mismatch: loc and ground_truth must have the same shape.")
+      
+
+        # Evaluate point forecast
+        metrics_df = self.evaluate_point_forecast(ground_truth, output["loc"], time_stamp)
+        metrics_df["test-time"] = self.test_walltime
+        metrics_df["Model"] = self.model_type.upper()
+
+        
+        # Create results DataFrame
+        results_df = self.create_results_df(
+            time_stamp,
+            ground_truth,
+            output["loc"],
+            self.model.data_pipeline.target_series,
+            self.model.data_pipeline.date_column,
+        )
+        results_df["Model"] = self.model_type.upper()
+
+        return results_df, metrics_df
 

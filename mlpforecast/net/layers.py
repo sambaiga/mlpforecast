@@ -429,9 +429,9 @@ class MLPForecastNetwork(nn.Module):
             dict: Dictionary containing the forecast predictions.
         """
         with torch.no_grad():
-            pred = self(x)
+            loc = self(x)
 
-        return {"pred": pred}
+        return {"loc": loc}
 
     def compute_combined_projection_feature(self, x):
         """
@@ -509,7 +509,7 @@ class MLPForecastNetwork(nn.Module):
     
 
 
-class MLPGAMForecastNetwork(nn.Module):
+class MLPGAMForecastNetwork(MLPForecastNetwork):
     """
     Multilayer Perceptron (MLP) Forecast Network for time series forecasting.
 
@@ -551,6 +551,7 @@ class MLPGAMForecastNetwork(nn.Module):
         out_activation_function: str = "Identity",
         dropout_rate: float = 0.25,
         alpha: float = 0.1,
+        lambda_lasso:float=1e-3,
         num_attention_heads: int = 4,
     ):
         """
@@ -576,60 +577,30 @@ class MLPGAMForecastNetwork(nn.Module):
             alpha (float, optional): Alpha parameter for the loss. Defaults to 0.1.
             num_attention_heads (int, optional): Number of heads in the multi-head attention. Defaults to 4.
         """
-        super().__init__()
+        super().__init__(n_target_series=n_target_series,
+        n_unknown_features=n_unknown_features,
+        n_known_calendar_features=n_known_calendar_features,
+        n_known_continuous_features=n_known_continuous_features,
+        embedding_size=embedding_size,
+        embedding_type=embedding_type,
+        combination_type=combination_type,
+        expansion_factor = expansion_factor,
+        residual=residual,
+        hidden_size=hidden_size,
+        num_layers=num_layers,
+        forecast_horizon=forecast_horizon,
+        input_window_size=input_window_size,
+        activation_function=activation_function,
+        out_activation_function=out_activation_function,
+        dropout_rate=dropout_rate,
+        alpha=alpha,
+        num_attention_heads=num_attention_heads)
 
-        # Ensure valid activation and embedding types
-        if activation_function not in ACTIVATIONS:
-            raise ValueError(f"Invalid activation_function. Please select from: {ACTIVATIONS}")
-
-        if out_activation_function not in ACTIVATIONS:
-            raise ValueError(f"Invalid out_activation_function. Please select from: {ACTIVATIONS}")
-
-        valid_embedding_types = [None, "PosEmb", "RotaryEmb", "CombinedEmb"]
-        if embedding_type not in valid_embedding_types:
-            raise ValueError(f"Invalid embedding type, choose from: {valid_embedding_types}")
-
-        self.n_out = n_target_series
-        self.n_unknown = n_unknown_features + self.n_out
-        self.n_covariates = n_known_calendar_features + n_known_continuous_features
-        self.n_channels = self.n_unknown + self.n_covariates
-        self.input_window_size = input_window_size
-        self.forecast_horizon = forecast_horizon
-        self.out_activation = getattr(nn, out_activation_function)()
-        self.activation = getattr(nn, activation_function)()
-
-        self.encoder = PastFutureEncoder(
-            embedding_size=embedding_size,
-            embedding_type=embedding_type,
-            latent_size=hidden_size,
-            num_layers=num_layers,
-            residual=residual,
-            expansion_factor=expansion_factor,
-            context_size=input_window_size,
-            activation=self.activation,
-            dropout_rate=dropout_rate,
-            n_channels=self.n_channels,
-        )
-
-        if self.n_covariates > 0:
-            self.horizon = PastFutureEncoder(
-                embedding_size=embedding_size,
-                embedding_type=embedding_type,
-                latent_size=hidden_size,
-                num_layers=num_layers,
-                residual=residual,
-                expansion_factor=expansion_factor,
-                context_size=forecast_horizon,
-                activation=self.activation,
-                dropout_rate=dropout_rate,
-                n_channels=self.n_covariates,
-            )
-
-        self.combination_type = combination_type
-        self.alpha = alpha
+        self.lambda_lasso = lambda_lasso
         self.bias = nn.Parameter(torch.zeros(self.n_out * forecast_horizon))  # Bias term
         # Linear transformations for encoded features
         self.past_feature_transform = nn.Linear(hidden_size, self.n_out * forecast_horizon, bias=False)
+        self.sigma = nn.Linear(self.n_out * forecast_horizon, self.n_out * forecast_horizon)
         
         if self.n_covariates > 0:
             self.future_feature_transform = nn.Linear(hidden_size, self.n_out * forecast_horizon, bias=False)
@@ -650,23 +621,43 @@ class MLPGAMForecastNetwork(nn.Module):
         with torch.no_grad():
             pred = self(x)
 
-        return {"pred": pred}
+        return {"loc": pred}
 
  
 
-    def lasso_penalty(self, layer, lambda_lasso):
+    def lasso_penalty(self):
         """
         Computes the Lasso penalty for the given layer.
 
         Args:
-            layer (nn.Module): The layer to compute the penalty for.
             lambda_lasso (float): The Lasso penalty coefficient.
 
         Returns:
             float: The computed Lasso penalty.
         """
-        l1_norm = sum(torch.sum(torch.abs(param)) for param in layer.parameters())
-        return lambda_lasso * l1_norm
+        l1_norm = self.lambda_lasso *self.past_feature_transform.weight.abs().mean()
+        if self.n_covariates > 0:
+            l1_norm += self.lambda_lasso *self.future_feature_transform.weight.abs().mean()
+        
+        return  l1_norm
+    
+    def forward_gam(self, x: torch.Tensor) -> torch.Tensor:
+        # Process past features
+        past_features = self.encoder(x[:, :self.input_window_size, :])
+        past_features_transformed = self.past_feature_transform(past_features)
+
+        if self.n_covariates > 0:
+            # Process future features
+            future_features = self.horizon(x[:, self.input_window_size:, self.n_unknown:])
+            future_features_transformed = self.future_feature_transform(future_features)
+        
+            # Combine past and future feature outputs
+            combined_output =  self.bias + past_features_transformed + future_features_transformed
+            
+        else:
+            combined_output =  self.bias + past_features_transformed
+        
+        return combined_output
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -679,22 +670,13 @@ class MLPGAMForecastNetwork(nn.Module):
         -------
             torch.Tensor: Output tensor after processing through the network.
         """
-        # Process past features
-        past_features = self.encoder(x[:, :self.input_window_size, :])
-        past_features_transformed = self.past_feature_transform(past_features)
-
-        if self.n_covariates > 0:
-            # Process future features
-            future_features = self.horizon(x[:, self.input_window_size:, self.n_unknown:])
-            future_features_transformed = self.future_feature_transform(future_features)
         
-            # Combine past and future feature outputs
-            combined_output = self.bias + past_features_transformed + future_features_transformed
-        else:
-            combined_output = self.bias + past_features_transformed
-        
-        loc = self.out_activation(combined_output.reshape(x.size(0), self.forecast_horizon, self.n_out))
+        combined_output=self.forward_gam(x)
+        loc = self.out_activation(combined_output)
+        loc = loc.reshape(x.size(0), self.forecast_horizon, self.n_out)
         return loc
+    
+  
     
     def step(self, batch: tuple, metric_fn: callable) -> tuple:
         """
@@ -711,15 +693,16 @@ class MLPGAMForecastNetwork(nn.Module):
         x, y = batch
 
         
-        loc = self(x)
+        loc= self(x)
         
 
         loss = (
-            self.alpha * F.mse_loss(loc, y, reduction="none").sum(dim=(1, 2)).mean()
-            + (1 - self.alpha) * F.l1_loss(loc, y, reduction="none").sum(dim=(1, 2)).mean()
+            self.alpha * F.mse_loss(loc, y)
+            + (1 - self.alpha) * F.l1_loss(loc, y)
         )
-        
-        metric = metric_fn(loc, y)
+        metric = loss
+        loss += self.lasso_penalty()
+        #metric = metric_fn(loc, y)
         
         return loss, metric
 

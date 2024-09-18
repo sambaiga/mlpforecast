@@ -225,8 +225,7 @@ class BacktestingForecast:
 
             filename = f"{key + 1}_cross_validation"
             model = model_instance(file_name=filename)
-            model_copy = deepcopy(model)
-            model_copy.fit(
+            model.fit(
                 train_df,
                 train_ratio=train_ratio,
                 drop_last=drop_last,
@@ -234,8 +233,9 @@ class BacktestingForecast:
                 batch_size=batch_size,
                 pin_memory=pin_memory,
             )
-            pred_df = model.predict(test_df)
-            metrics = model.metrics
+            model.train_df=train_df
+            pred_df, metrics  = model.evaluate(test_df=test_df)
+            
             metrics["Folds"] = key + 1
             pred_df["Folds"] = key + 1
 
@@ -243,3 +243,73 @@ class BacktestingForecast:
             backtest_df = pd.concat([backtest_df, pred_df], axis=0)
 
         return backtest_df, backtest_metrics
+    
+    def plot(self, ax=None,  middle = 10, large = 12, train_ratio=0.8):
+        import matplotlib.pyplot as plt
+        tr_start = list()
+        tr_len = list()
+        # technically should be just self.forecast_len
+        tt_len = list()
+        yticks = list(range(1,self.generator.n_splits + 1))
+        val_len = list()
+        for idx, scheme in self.generator._split_scheme.items():
+            # fill in indices with the training/test groups
+            tr_start.append(list(scheme["train_idx"])[0])
+            train_len=len(list(scheme["train_idx"]))
+            tr_len.append(int(train_ratio*train_len))
+            val_len.append(int((1-train_ratio)*train_len))
+            tt_len.append(self.generator.forecast_len)
+
+        tr_start = np.array(tr_start)
+        tr_len = np.array(tr_len)
+        val_len=np.array(val_len)
+
+        if ax is None:
+            fig, ax = plt.subplots(1,1, figsize=(9,3))
+        ax.barh(
+                    yticks,
+                    tr_len,
+                    align="center",
+                    height=0.5,
+                    left=tr_start,
+                    label="train",
+                )
+
+        ax.barh(
+                    yticks,
+                    val_len,
+                    align="center",
+                    height=0.5,
+                    left=tr_start + tr_len,
+                    label="val",
+                )
+        ax.barh(
+                    yticks,
+                    tt_len,
+                    align="center",
+                    height=0.5,
+                    left=tr_start + tr_len +val_len,
+                    label="test",
+                )
+
+        strftime_fmt="%Y-%m-%d"
+        xticks_loc = np.array(ax.get_xticks(), dtype=int)
+        new_xticks_loc = np.linspace(
+                        0, len(self.generator.dt_array) - 1, num=len(xticks_loc)
+                    ).astype(int)
+        dt_xticks = self.generator.dt_array[new_xticks_loc]
+        dt_xticks = dt_xticks.strftime(strftime_fmt)
+        ax.set_xticks(new_xticks_loc)
+        ax.set_xticklabels(dt_xticks)
+
+        # some formatting parameters
+       
+
+        ax.set_yticks(yticks)
+        ax.set_ylabel("Folds", fontsize=large)
+        ax.invert_yaxis()
+        # ax.grid(which="both", color='grey', alpha=0.5)
+        ax.tick_params(axis="x", which="major", labelsize=middle)
+        ax.set_title("Train/Test Split Scheme", fontsize=large)
+
+        return ax

@@ -4,6 +4,5 @@ This module define non-parametric and parametric distributions used to produce p
 '''
 __all__ = ['FPQRNetwork', 
            'QRNetwork', 
-           'MCDMultivariateNormal', 
            'LaplaceNetwork'
            ]

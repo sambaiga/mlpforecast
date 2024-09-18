@@ -3,7 +3,7 @@ import logging
 import torch
 
 from mlpforecast.model.base_model import BaseForecastModel
-from mlpforecast.net.layers import MLPForecastNetwork
+from mlpforecast.net.layers import MLPForecastNetwork, MLPGAMForecastNetwork
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")
@@ -49,6 +49,8 @@ class MLPForecastModel(BaseForecastModel):
         prob_decay_2: float = 0.9,
         gamma: float = 0.01,
         max_epochs: int = 10,
+        lambda_lasso:float=1e-3,
+        gam_layer:bool=False,
     ):
         r"""
         Multilayer Perceptron (MLP) Forecast Model for time series forecasting.
@@ -111,25 +113,45 @@ class MLPForecastModel(BaseForecastModel):
         n_unknown = len(unknown_features) + self.n_out
         n_covariates = len(known_calendar_features) + len(known_continuous_features)
         self.n_channels = n_unknown + n_covariates
-
-        self.model = MLPForecastNetwork(
-            n_target_series=self.n_out,
-            n_unknown_features=len(unknown_features),
-            n_known_calendar_features=len(known_calendar_features),
-            n_known_continuous_features=len(known_continuous_features),
-            embedding_size=embedding_size,
-            embedding_type=embedding_type,
-            combination_type=combination_type,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            forecast_horizon=forecast_horizon,
-            input_window_size=input_window_size,
-            activation_function=activation_function,
-            out_activation_function=out_activation_function,
-            dropout_rate=dropout_rate,
-            alpha=alpha,
-            num_attention_heads=num_attention_heads,
-        )
+        if gam_layer:
+            self.model = MLPGAMForecastNetwork(
+                n_target_series=self.n_out,
+                n_unknown_features=len(unknown_features),
+                n_known_calendar_features=len(known_calendar_features),
+                n_known_continuous_features=len(known_continuous_features),
+                embedding_size=embedding_size,
+                embedding_type=embedding_type,
+                combination_type=combination_type,
+                hidden_size=hidden_size,
+                num_layers=num_layers,
+                forecast_horizon=forecast_horizon,
+                input_window_size=input_window_size,
+                activation_function=activation_function,
+                out_activation_function=out_activation_function,
+                dropout_rate=dropout_rate,
+                alpha=alpha,
+                lambda_lasso=lambda_lasso,
+                num_attention_heads=num_attention_heads,
+            )
+        else:
+            self.model = MLPForecastNetwork(
+                n_target_series=self.n_out,
+                n_unknown_features=len(unknown_features),
+                n_known_calendar_features=len(known_calendar_features),
+                n_known_continuous_features=len(known_continuous_features),
+                embedding_size=embedding_size,
+                embedding_type=embedding_type,
+                combination_type=combination_type,
+                hidden_size=hidden_size,
+                num_layers=num_layers,
+                forecast_horizon=forecast_horizon,
+                input_window_size=input_window_size,
+                activation_function=activation_function,
+                out_activation_function=out_activation_function,
+                dropout_rate=dropout_rate,
+                alpha=alpha,
+                num_attention_heads=num_attention_heads,
+            )
 
 
     def forecast(self, x):

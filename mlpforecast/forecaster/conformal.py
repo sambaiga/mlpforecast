@@ -3,18 +3,30 @@ from __future__ import annotations
 import logging
 
 import numpy as np
+import pandas as pd
 import optuna
 from optuna import Trial
-
+from mlpforecast.distribution.conformal import ConformalResidualFitting
 from mlpforecast.forecaster.common import PytorchForecast
 from mlpforecast.forecaster.utils import get_latest_checkpoint
-from mlpforecast.model.parametric import MLPLaplaceForecastModel
 from mlpforecast.net.layers import ACTIVATIONS
+from mlpforecast.model.conformal_crf import MLPCRFForecastModel
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("MLPFQR")
+logger = logging.getLogger("MLPF")
 
-class MLPLaplaceForecast(PytorchForecast):
+
+class MLPGAMCRForecast(PytorchForecast):
+    """
+    MLP Forecasting class for managing training, evaluation, and prediction.
+
+    Attributes:
+        hparams (dict): Hyperparameters for the MLP model.
+        model (MLPForecastModel): PyTorch model.
+        train_df (pd.DataFrame): Training DataFrame.
+        validation_df (pd.DataFrame): Validation DataFrame.
+    """
+    
     def __init__(
         self,
         hparams: dict,
@@ -26,7 +38,8 @@ class MLPLaplaceForecast(PytorchForecast):
         metric: str = "val_mae",
         max_epochs: int = 10,
         wandb: bool = False,
-        model_type: str = "MLPF",
+        model_type: str = "MLPGAMCR",
+        confidence_level:float=0.1,
         gradient_clip_val: float = 10.0,
         rich_progress_bar: bool = True,
     ):
@@ -48,6 +61,7 @@ class MLPLaplaceForecast(PytorchForecast):
             rich_progress_bar (bool, optional): Whether to use rich progress bar. Defaults to True.
         """
         super().__init__(
+            exp_name=exp_name,
             file_name=file_name,
             seed=seed,
             root_dir=root_dir,
@@ -60,8 +74,11 @@ class MLPLaplaceForecast(PytorchForecast):
             rich_progress_bar=rich_progress_bar,
         )
         self.hparams = hparams
-        self.model = MLPLaplaceForecastModel(**hparams)
-
+        self.confidence_level=confidence_level
+        self.model = MLPCRFForecastModel(**hparams)
+        self.crf_cp = None
+        self.conformalise = False
+    
     def load_checkpoint(self):
         """
         Load the latest checkpoint for the model.
@@ -69,9 +86,41 @@ class MLPLaplaceForecast(PytorchForecast):
         This method retrieves the path of the latest checkpoint and loads the model from it.
         """
         path_best_model = get_latest_checkpoint(self.checkpoints)
-        self.model = MLPLaplaceForecastModel.load_from_checkpoint(path_best_model)
+        self.model = MLPCRFForecastModel.load_from_checkpoint(path_best_model)
         self.model.eval()
 
+    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
+        
+        test_df = self.format_test_df(test_df)
+        self.model.data_pipeline.daily_features=daily_feature
+        
+        features, _ = self.model.data_pipeline.transform(test_df.copy())
+        output=self.perform_prediction(features)
+        N, T, C = output["loc"].size()
+
+        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
+        target_scaler    = scaler.named_transformers_["target_scaler"]
+        output['scale']  = target_scaler.get_params()['target_scaler'].scale_*(output['scale'].numpy().reshape(N * T, C))
+        output['scale']  = output['scale'].reshape(N, T, C)
+        
+        output["loc"] = target_scaler.inverse_transform(output["loc"].numpy().reshape(N * T, C))
+        output["loc"] = output["loc"].reshape(N, T, C)
+
+        if self.conformalise:
+            output=self.crf_cp.get_calibrated_pred(output)
+        return output
+    
+    def calibrate(self, calibrate_df=None, 
+                  covariate_df=None, 
+                  daily_feature=False, conformal_type:str='sigma-res',):
+        
+        self.crf_cp = ConformalResidualFitting(conformal_type=conformal_type)
+        
+        outputs=self.predict(test_df=calibrate_df, daily_feature=daily_feature)
+        _, ground_truth = self.get_ground_truth(calibrate_df, daily_feature)
+        self.crf_cp.calibrate(outputs['loc'], outputs['scale'], ground_truth, self.confidence_level)
+        self.conformalise=True
+    
     def get_search_params(self, trial: Trial) -> dict:
         """
         Define the search space for hyperparameter optimization using Optuna.
@@ -90,32 +139,35 @@ class MLPLaplaceForecast(PytorchForecast):
         params["hidden_size"] = trial.suggest_int("hidden_size", 8, 512, step=2)
         params["num_layers"] = trial.suggest_int("num_layers", 1, 5)
         params["expansion_factor"] = trial.suggest_int("expansion_factor", 1, 4)
-        params["N"] = trial.suggest_int("N", 10, 100)
 
         # Define categorical hyperparameters
         params["embedding_type"] = trial.suggest_categorical(
-            "embedding_type", [None, "PosEmb", "RotaryEmb", "CombinedEmb"]
+            "embedding_type", [None, "PosEmb"]
         )
         params["combination_type"] = trial.suggest_categorical("combination_type", ["addition-comb", "weighted-comb"])
         params["residual"] = trial.suggest_categorical("residual", [True, False])
         params["activation_function"] = trial.suggest_categorical("activation_function", ACTIVATIONS)
         params["out_activation_function"] = trial.suggest_categorical("out_activation_function", ACTIVATIONS)
 
+        if params["residual"]:
+            params["expansion_factor"] = 1
         # Define float hyperparameters
         params["dropout_rate"] = trial.suggest_float("dropout_rate", 0.0, 0.9, step=0.05)
-        params["kappa"] = trial.suggest_float("kappa", 1e-3, 1, log=True)
-        params["eps"] = trial.suggest_float("eps", 1e-6, 1e-3, log=True)
-        params["alpha"] = trial.suggest_float("alpha", 1e-3, 1.0,log=True)
-
+        params["alpha"] = trial.suggest_float("alpha", 1e-3, 1.0, log=True)
+        params['lambda_lasso'] = trial.suggest_float("lambda_lasso", 1e-6, 1e-2, log=True)
         return params
+       
 
     def auto_tune(self, train_df, val_df, num_trial=10, reduction_factor=3, patience=2):
         """
         Perform hyperparameter tuning using Optuna.
 
         Args:
-            train_df: Training DataFrame.
-            val_df: Validation DataFrame.
+            train_df (pd.DataFrame): Training DataFrame.
+            val_df (pd.DataFrame): Validation DataFrame.
+            num_trial (int, optional): Number of trials for hyperparameter optimization. Defaults to 10.
+            reduction_factor (int, optional): Reduction factor for Hyperband pruner. Defaults to 3.
+            patience (int, optional): Patience for the Patient pruner. Defaults to
         """
         self.train_df = train_df
         self.validation_df = val_df
@@ -128,7 +180,7 @@ class MLPLaplaceForecast(PytorchForecast):
             params = self.get_search_params(trial)
 
             self.hparams.update(params)
-            model = MLPLaplaceForecastModel(
+            model = MLPCRFForecastModel(
                 self.hparams,
                 exp_name=f"{self.exp_name}",
                 seed=42,
@@ -159,4 +211,9 @@ class MLPLaplaceForecast(PytorchForecast):
             callbacks=[print_callback],
         )
         self.hparams.update(study.best_trial.params)
+        self.best_params=study.best_trial.params
         np.save(f"{self.results_path}/best_params.npy", study.best_trial.params)
+
+
+    
+    

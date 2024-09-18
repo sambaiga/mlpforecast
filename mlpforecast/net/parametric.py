@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mlpforecast.net.layers import MLPForecastNetwork
-from mlpforecast.distribution.parametric import  LaplaceDistribution, MCDMultivariateNormal
+from mlpforecast.distribution.parametric import  LaplaceDistribution
 
 
 class LaplaceForecastNetwork(MLPForecastNetwork):
@@ -115,86 +115,3 @@ class LaplaceForecastNetwork(MLPForecastNetwork):
         z = self.compute_combined_projection_feature(x)
         return self.parametric_net.sample(z, num_samples)
 
-
-class MCDMultForecastNetwork(MLPForecastNetwork):
-    """
-    Multilayer Perceptron (MLP) Modified Cholesky Decomposition Multivariate Normal (MCDGauss)
-    Forecast Network for time series forecasting.
-    """
-
-    def __init__(self, n_target_series: int, n_unknown_features: int, n_known_calendar_features: int, 
-                 n_known_continuous_features: int, embedding_size: int = 28, embedding_type: str = None, 
-                 combination_type: str = "attn-comb", expansion_factor: int = 2, residual: bool = False, 
-                 hidden_size: int = 256, num_layers: int = 2, forecast_horizon: int = 48, input_window_size: int = 96, 
-                 activation_function: str = "SiLU", out_activation_function: str = "Identity", dropout_rate: float = 0.25, 
-                 alpha: float = 0.1, num_attention_heads: int = 4):
-        
-        super().__init__(n_target_series=n_target_series, n_unknown_features=n_unknown_features, 
-                         n_known_calendar_features=n_known_calendar_features, 
-                         n_known_continuous_features=n_known_continuous_features, embedding_size=embedding_size, 
-                         embedding_type=embedding_type, combination_type=combination_type, expansion_factor=expansion_factor, 
-                         residual=residual, hidden_size=hidden_size, num_layers=num_layers, forecast_horizon=forecast_horizon, 
-                         input_window_size=input_window_size, activation_function=activation_function, 
-                         out_activation_function=out_activation_function, dropout_rate=dropout_rate, alpha=alpha, 
-                         num_attention_heads=num_attention_heads)
-        
-        self.parametric_net = MCDMultivariateNormal(num_outputs=n_target_series,
-                                                   hidden_size=hidden_size,
-                                                   forecast_horizon=forecast_horizon,
-                                                   activation_function=self.activation,
-                                                   output_activation_function=self.out_activation,
-                                                   dropout_rate=dropout_rate)
-    def forward(self, x):
-        """
-        Forward pass through the network.
-
-        Args:
-            x (torch.Tensor): Input tensor.
-
-        Returns:
-            torch.Tensor: Output tensor from the parametric network.
-        """
-        z = self.compute_combined_projection_feature(x)
-        return self.parametric_net(z)
-
-    def step(self, batch: tuple, metric_fn: callable) -> tuple:
-        """
-        Training step for the network.
-
-        Args:
-            batch (tuple): Tuple containing input and target tensors.
-            metric_fn (callable): Metric function to evaluate.
-
-        Returns:
-            tuple: Tuple containing the loss and computed metric.
-        """
-        x, y = batch
-        z = self.compute_combined_projection_feature(x)
-        return self.parametric_net.step(z, y, metric_fn)
-
-    def forecast(self, x):
-        """
-        Generate forecasts using the network.
-
-        Args:
-            x (torch.Tensor): Input tensor.
-
-        Returns:
-            dict: Dictionary containing the forecast location, quantile samples, and taus.
-        """
-        z = self.compute_combined_projection_feature(x)
-        return self.parametric_net.forecast(z)
-    
-    def sample(self, x, num_samples=500):
-        """
-        Generate samples using the network.
-
-        Args:
-            x (torch.Tensor): Input tensor.
-            num_samples (int): Number of samples to generate.
-
-        Returns:
-            dict: Dictionary containing the forecast samples.
-        """
-        z = self.compute_combined_projection_feature(x)
-        return self.parametric_net.sample(z, num_samples)

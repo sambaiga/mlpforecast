@@ -3,13 +3,13 @@ import logging
 import torch
 
 from mlpforecast.model.base_model import BaseForecastModel
-from mlpforecast.net.layers import MLPGAMForecastNetwork
+from mlpforecast.net.non_parametric_crf import MLPCRFForecastNetwork
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")
 
 
-class MLPGAMForecastModel(BaseForecastModel):
+class MLPCRFForecastModel(BaseForecastModel):
     """
     MLP Forecast Model for time series point forecasting.
 
@@ -48,6 +48,9 @@ class MLPGAMForecastModel(BaseForecastModel):
         prob_decay_1: float = 0.75,
         prob_decay_2: float = 0.9,
         gamma: float = 0.01,
+        lambda_lasso:float=1e-3,
+        normal_sigma:bool=False,
+        sign_res:bool=False,
         max_epochs: int = 10,
     ):
         r"""
@@ -112,7 +115,7 @@ class MLPGAMForecastModel(BaseForecastModel):
         n_covariates = len(known_calendar_features) + len(known_continuous_features)
         self.n_channels = n_unknown + n_covariates
 
-        self.model = MLPGAMForecastNetwork(
+        self.model = MLPCRFForecastNetwork(
             n_target_series=self.n_out,
             n_unknown_features=len(unknown_features),
             n_known_calendar_features=len(known_calendar_features),
@@ -128,8 +131,12 @@ class MLPGAMForecastModel(BaseForecastModel):
             out_activation_function=out_activation_function,
             dropout_rate=dropout_rate,
             alpha=alpha,
+            lambda_lasso=lambda_lasso,
+            normal_sigma=normal_sigma,
+            sign_res=sign_res,
             num_attention_heads=num_attention_heads,
         )
+        self.automatic_optimization=False
 
 
     def forecast(self, x):
@@ -166,10 +173,25 @@ class MLPGAMForecastModel(BaseForecastModel):
         Returns:
             (tensor): The loss value for the batch.
         """
-        loss, metric = self.model.step(batch, self.tra_metric_fcn)
-        self.log("train_loss", loss, prog_bar=True, logger=True)
+        opt_mu , opt_sigma = self.optimizers()
+        self.toggle_optimizer(opt_mu)
+        loss_mu, metric = self.model.step(batch, self.tra_metric_fcn)
+        opt_mu.zero_grad()
+        self.manual_backward(loss_mu)
+        opt_mu.step()
+        self.untoggle_optimizer(opt_mu)
+            
+        self.toggle_optimizer(opt_sigma)
+        loss_sigma, metric = self.model.step_sigma(batch, self.tra_metric_fcn)
+        opt_sigma.zero_grad()
+        self.manual_backward(loss_sigma)
+        opt_sigma.step()
+        self.untoggle_optimizer(opt_sigma)
+
+        self.log("train_mu_loss",loss_mu, prog_bar=True, logger=True)
+        self.log("train_sigma_loss",loss_sigma, prog_bar=True, logger=True)
         self.log(f"train_{self.hparams['metric']}", metric, prog_bar=True, logger=True)
-        return loss
+       
 
 
     def validation_step(self, batch, batch_idx):
@@ -198,10 +220,15 @@ class MLPGAMForecastModel(BaseForecastModel):
         p1 = int(self.hparams["prob_decay_1"] * self.hparams["max_epochs"])
         p2 = int(self.hparams["prob_decay_2"] * self.hparams["max_epochs"])
 
-        optimizer = torch.optim.Adam(
-            self.parameters(),
-            lr=self.hparams["learning_rate"],
-            weight_decay=self.hparams["weight_decay"],
-        )
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[p1, p2], gamma=self.hparams["gamma"])
-        return [optimizer], [scheduler]
+        
+        self.model.linear_to_sigma.weight.requires_grad = False
+        self.model.linear_to_sigma.bias.requires_grad = False
+        opt_mu = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()),  lr=self.hparams.learning_rate,  weight_decay=self.hparams.weight_decay)
+        scheduler  = torch.optim.lr_scheduler.MultiStepLR(opt_mu, milestones=[p1, p2], gamma=0.1)
+            
+        # optimise sigma layer paramater freeze the  rest
+        self.model.linear_to_sigma.weight.requires_grad = True
+        self.model.linear_to_sigma.bias.requires_grad = True
+        opt_sigma = torch.optim.Adam(list(self.model.linear_to_sigma.parameters()), lr=self.hparams.learning_rate,  weight_decay=self.hparams.weight_decay)
+
+        return [opt_mu, opt_sigma], [scheduler]
