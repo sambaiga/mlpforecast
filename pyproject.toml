@@ -37,8 +37,12 @@ seaborn = ">=0.13.2"
 statsmodels = ">=0.14.0"
 coreforecast="^0.0.6"
 utilsforecast="^0.0.25"
-pmdarima="^2.0.4"
 lets-plot="^4.4.0"
+neuralforecast="^1.7.5"
+xgboost="^2.1.1"
+catboost="^1.2.7"
+lightgbm="^4.5.0"
+
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.1"

@@ -3,18 +3,28 @@ from __future__ import annotations
 import logging
 
 import numpy as np
+import pandas as pd
 import optuna
 from optuna import Trial
 
 from mlpforecast.forecaster.common import PytorchForecast
 from mlpforecast.forecaster.utils import get_latest_checkpoint
-from mlpforecast.model.parametric import MLPLaplaceForecastModel
-from mlpforecast.net.layers import ACTIVATIONS
-
+from mlpforecast.model.timesnet import TimesNetForecastModel
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("MLPFQR")
+logger = logging.getLogger("TimesNetForecast")
 
-class MLPLaplaceForecast(PytorchForecast):
+
+class TimesNetForecast(PytorchForecast):
+    """
+    MLP Forecasting class for managing training, evaluation, and prediction.
+
+    Attributes:
+        hparams (dict): Hyperparameters for the MLP model.
+        model (MLPForecastModel): PyTorch model.
+        train_df (pd.DataFrame): Training DataFrame.
+        validation_df (pd.DataFrame): Validation DataFrame.
+    """
+    
     def __init__(
         self,
         hparams: dict,
@@ -26,7 +36,7 @@ class MLPLaplaceForecast(PytorchForecast):
         metric: str = "val_mae",
         max_epochs: int = 10,
         wandb: bool = False,
-        model_type: str = "MLPFLD",
+        model_type: str = "Timesnet",
         gradient_clip_val: float = 10.0,
         rich_progress_bar: bool = True,
     ):
@@ -48,6 +58,7 @@ class MLPLaplaceForecast(PytorchForecast):
             rich_progress_bar (bool, optional): Whether to use rich progress bar. Defaults to True.
         """
         super().__init__(
+            exp_name=exp_name,
             file_name=file_name,
             seed=seed,
             root_dir=root_dir,
@@ -57,10 +68,10 @@ class MLPLaplaceForecast(PytorchForecast):
             wandb=wandb,
             model_type=model_type,
             gradient_clip_val=gradient_clip_val,
-            rich_progress_bar=rich_progress_bar,
-        )
+            rich_progress_bar=rich_progress_bar)
+        
         self.hparams = hparams
-        self.model = MLPLaplaceForecastModel(**hparams)
+        self.model = TimesNetForecastModel(**hparams)
 
     def load_checkpoint(self):
         """
@@ -69,53 +80,20 @@ class MLPLaplaceForecast(PytorchForecast):
         This method retrieves the path of the latest checkpoint and loads the model from it.
         """
         path_best_model = get_latest_checkpoint(self.checkpoints)
-        self.model = MLPLaplaceForecastModel.load_from_checkpoint(path_best_model)
+        self.model = TimesNetForecastModel.load_from_checkpoint(path_best_model)
         self.model.eval()
 
-    def get_search_params(self, trial: Trial) -> dict:
-        """
-        Define the search space for hyperparameter optimization using Optuna.
-
-        Args:
-            trial: An Optuna trial object to suggest parameters.
-
-        Returns
-        -------
-            dict: A dictionary containing suggested hyperparameters.
-        """
-        params = {}
-
-        # Define integer hyperparameters
-        params["embedding_size"] = trial.suggest_int("embedding_size", 8, 64, step=2)
-        params["hidden_size"] = trial.suggest_int("hidden_size", 8, 512, step=2)
-        params["num_layers"] = trial.suggest_int("num_layers", 1, 5)
-        params["expansion_factor"] = trial.suggest_int("expansion_factor", 1, 4)
-        params["N"] = trial.suggest_int("N", 10, 100)
-
-        # Define categorical hyperparameters
-        params["embedding_type"] = trial.suggest_categorical(
-            "embedding_type", [None, "PosEmb", "RotaryEmb", "CombinedEmb"]
-        )
-        params["combination_type"] = trial.suggest_categorical("combination_type", ["addition-comb", "weighted-comb"])
-        params["residual"] = trial.suggest_categorical("residual", [True, False])
-        params["activation_function"] = trial.suggest_categorical("activation_function", ACTIVATIONS)
-        params["out_activation_function"] = trial.suggest_categorical("out_activation_function", ACTIVATIONS)
-
-        # Define float hyperparameters
-        params["dropout_rate"] = trial.suggest_float("dropout_rate", 0.0, 0.9, step=0.05)
-        params["kappa"] = trial.suggest_float("kappa", 1e-3, 1, log=True)
-        params["eps"] = trial.suggest_float("eps", 1e-6, 1e-3, log=True)
-        params["alpha"] = trial.suggest_float("alpha", 1e-3, 1.0,log=True)
-
-        return params
-
+    
     def auto_tune(self, train_df, val_df, num_trial=10, reduction_factor=3, patience=2):
         """
         Perform hyperparameter tuning using Optuna.
 
         Args:
-            train_df: Training DataFrame.
-            val_df: Validation DataFrame.
+            train_df (pd.DataFrame): Training DataFrame.
+            val_df (pd.DataFrame): Validation DataFrame.
+            num_trial (int, optional): Number of trials for hyperparameter optimization. Defaults to 10.
+            reduction_factor (int, optional): Reduction factor for Hyperband pruner. Defaults to 3.
+            patience (int, optional): Patience for the Patient pruner. Defaults to
         """
         self.train_df = train_df
         self.validation_df = val_df
@@ -125,10 +103,11 @@ class MLPLaplaceForecast(PytorchForecast):
             logging.info(f"""Best value: {study.best_value}, Best params: {study.best_trial.params}""")
 
         def objective(trial):
-            params = self.get_search_params(trial)
+            
+            params = self.model.get_search_params(trial)
 
             self.hparams.update(params)
-            model = MLPLaplaceForecastModel(
+            model = TimesNetForecastModel(
                 self.hparams,
                 exp_name=f"{self.exp_name}",
                 seed=42,
@@ -140,8 +119,11 @@ class MLPLaplaceForecast(PytorchForecast):
             val_cost = model.fit(self.train_df, self.validation_df)
             return val_cost
 
+        
         study_name = f"{self.exp_name}_{self.model_type}"
-        storage_name = f"sqlite:///{study_name}.db"
+        storage = optuna.storages.JournalStorage(
+            optuna.storages.journal.JournalFileBackend(f"{self.logs}/{study_name}.log")
+        )
         base_pruner = optuna.pruners.HyperbandPruner(
             min_resource=1, max_resource="auto", reduction_factor=reduction_factor
         )
@@ -149,8 +131,8 @@ class MLPLaplaceForecast(PytorchForecast):
         study = optuna.create_study(
             direction="minimize",
             pruner=pruner,
-            study_name=self.exp_name,
-            storage=storage_name,
+            study_name=study_name,
+            storage=storage,
             load_if_exists=True,
         )
         study.optimize(
@@ -160,3 +142,7 @@ class MLPLaplaceForecast(PytorchForecast):
         )
         self.hparams.update(study.best_trial.params)
         np.save(f"{self.results_path}/best_params.npy", study.best_trial.params)
+
+
+    
+

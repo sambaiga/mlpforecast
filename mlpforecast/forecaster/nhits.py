@@ -5,18 +5,14 @@ import logging
 import numpy as np
 import pandas as pd
 import optuna
-from optuna import Trial
-from mlpforecast.distribution.conformal import ConformalResidualFitting
 from mlpforecast.forecaster.common import PytorchForecast
 from mlpforecast.forecaster.utils import get_latest_checkpoint
-from mlpforecast.net.layers import ACTIVATIONS
-from mlpforecast.model.conformal_crf import MLPCRFForecastModel
-
+from mlpforecast.model.nhits import NHITSForecastModel
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MLPF")
 
 
-class MLPGAMCRForecast(PytorchForecast):
+class NHITSForecast(PytorchForecast):
     """
     MLP Forecasting class for managing training, evaluation, and prediction.
 
@@ -38,8 +34,7 @@ class MLPGAMCRForecast(PytorchForecast):
         metric: str = "val_mae",
         max_epochs: int = 10,
         wandb: bool = False,
-        model_type: str = "MLPGAMCR",
-        confidence_level:float=0.1,
+        model_type: str = "NHITS",
         gradient_clip_val: float = 10.0,
         rich_progress_bar: bool = True,
     ):
@@ -74,11 +69,8 @@ class MLPGAMCRForecast(PytorchForecast):
             rich_progress_bar=rich_progress_bar,
         )
         self.hparams = hparams
-        self.confidence_level=confidence_level
-        self.model = MLPCRFForecastModel(**hparams)
-        self.crf_cp = None
-        self.conformalise = False
-    
+        self.model = NHITSForecastModel(**hparams)
+
     def load_checkpoint(self):
         """
         Load the latest checkpoint for the model.
@@ -86,77 +78,12 @@ class MLPGAMCRForecast(PytorchForecast):
         This method retrieves the path of the latest checkpoint and loads the model from it.
         """
         path_best_model = get_latest_checkpoint(self.checkpoints)
-        self.model = MLPCRFForecastModel.load_from_checkpoint(path_best_model)
+        self.model = NHITSForecastModel.load_from_checkpoint(path_best_model)
         self.model.eval()
 
-    def predict(self, test_df=None, covariate_df=None, daily_feature=True):
-        
-        test_df = self.format_test_df(test_df)
-        self.model.data_pipeline.daily_features=daily_feature
-        
-        features, _ = self.model.data_pipeline.transform(test_df.copy())
-        output=self.perform_prediction(features)
-        N, T, C = output["loc"].size()
-
-        scaler = self.model.data_pipeline.data_pipeline.named_steps["scaling"]
-        target_scaler    = scaler.named_transformers_["target_scaler"]
-        output['scale']  = target_scaler.get_params()['target_scaler'].scale_*(output['scale'].numpy().reshape(N * T, C))
-        output['scale']  = output['scale'].reshape(N, T, C)
-        
-        output["loc"] = target_scaler.inverse_transform(output["loc"].numpy().reshape(N * T, C))
-        output["loc"] = output["loc"].reshape(N, T, C)
-
-        if self.conformalise:
-            output=self.crf_cp.get_calibrated_pred(output)
-        return output
     
-    def calibrate(self, calibrate_df=None, 
-                  covariate_df=None, 
-                  daily_feature=False, conformal_type:str='sigma-res',):
-        
-        self.crf_cp = ConformalResidualFitting(conformal_type=conformal_type)
-        
-        outputs=self.predict(test_df=calibrate_df, daily_feature=daily_feature)
-        _, ground_truth = self.get_ground_truth(calibrate_df, daily_feature)
-        self.crf_cp.calibrate(outputs['loc'], outputs['scale'], ground_truth, self.confidence_level)
-        self.conformalise=True
+
     
-    def get_search_params(self, trial: Trial) -> dict:
-        """
-        Define the search space for hyperparameter optimization using Optuna.
-
-        Args:
-            trial: An Optuna trial object to suggest parameters.
-
-        Returns
-        -------
-            dict: A dictionary containing suggested hyperparameters.
-        """
-        params = {}
-
-        # Define integer hyperparameters
-        params["embedding_size"] = trial.suggest_int("embedding_size", 8, 64, step=2)
-        params["hidden_size"] = trial.suggest_int("hidden_size", 8, 512, step=2)
-        params["num_layers"] = trial.suggest_int("num_layers", 1, 5)
-        params["expansion_factor"] = trial.suggest_int("expansion_factor", 1, 4)
-
-        # Define categorical hyperparameters
-        params["embedding_type"] = trial.suggest_categorical(
-            "embedding_type", [None, "PosEmb"]
-        )
-        params["combination_type"] = trial.suggest_categorical("combination_type", ["addition-comb", "weighted-comb"])
-        params["residual"] = trial.suggest_categorical("residual", [True, False])
-        params["activation_function"] = trial.suggest_categorical("activation_function", ACTIVATIONS)
-        params["out_activation_function"] = trial.suggest_categorical("out_activation_function", ACTIVATIONS)
-
-        if params["residual"]:
-            params["expansion_factor"] = 1
-        # Define float hyperparameters
-        params["dropout_rate"] = trial.suggest_float("dropout_rate", 0.0, 0.9, step=0.05)
-        params["alpha"] = trial.suggest_float("alpha", 1e-3, 1.0, log=True)
-        params['lambda_lasso'] = trial.suggest_float("lambda_lasso", 1e-6, 1e-2, log=True)
-        return params
-       
 
     def auto_tune(self, train_df, val_df, num_trial=10, reduction_factor=3, patience=2):
         """
@@ -177,10 +104,10 @@ class MLPGAMCRForecast(PytorchForecast):
             logging.info(f"""Best value: {study.best_value}, Best params: {study.best_trial.params}""")
 
         def objective(trial):
-            params = self.get_search_params(trial)
-
+            
+            params = self.model.get_search_params(trial)
             self.hparams.update(params)
-            model = MLPCRFForecastModel(
+            model = NHITSForecast(
                 self.hparams,
                 exp_name=f"{self.exp_name}",
                 seed=42,
@@ -193,7 +120,9 @@ class MLPGAMCRForecast(PytorchForecast):
             return val_cost
 
         study_name = f"{self.exp_name}_{self.model_type}"
-        storage_name = f"sqlite:///{study_name}.db"
+        storage = optuna.storages.JournalStorage(
+            optuna.storages.journal.JournalFileBackend(f"{self.logs}/{study_name}.log")
+        )
         base_pruner = optuna.pruners.HyperbandPruner(
             min_resource=1, max_resource="auto", reduction_factor=reduction_factor
         )
@@ -201,8 +130,8 @@ class MLPGAMCRForecast(PytorchForecast):
         study = optuna.create_study(
             direction="minimize",
             pruner=pruner,
-            study_name=self.exp_name,
-            storage=storage_name,
+            study_name=study_name,
+            storage=storage,
             load_if_exists=True,
         )
         study.optimize(
@@ -210,10 +139,10 @@ class MLPGAMCRForecast(PytorchForecast):
             n_trials=num_trial,  # Default to 100 trials if not specified
             callbacks=[print_callback],
         )
+        
         self.hparams.update(study.best_trial.params)
-        self.best_params=study.best_trial.params
         np.save(f"{self.results_path}/best_params.npy", study.best_trial.params)
 
 
     
-    
+

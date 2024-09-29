@@ -64,6 +64,27 @@ class BaseForecastModel(pl.LightningModule):
         self.save_hyperparameters()
         self.checkpoint_path = "./"
 
+    def forward(self, x):
+        """
+        Forward pass of the model.
+
+        Args:
+            x (tensor): Input data.
+        """
+        return self.model(x)
+
+    def forecast(self, x):
+        """
+        Generate forecast for the given input.
+
+        Args:
+            x (tensor): Input data for forecasting.
+
+        Returns:
+            (tensor): Forecasted values.
+        """
+        return self.model.forecast(x)
+
     def on_save_checkpoint(self, checkpoint):
         """
         Save the data pipeline to a file and add the file path to the checkpoint dictionary.

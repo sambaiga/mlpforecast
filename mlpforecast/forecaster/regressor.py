@@ -1,0 +1,158 @@
+from __future__ import annotations
+import logging
+import numpy as np
+import pandas as pd
+import optuna
+from optuna import Trial
+from mlpforecast.forecaster.utils import  get_latest_checkpoint
+from mlpforecast.forecaster.common_regressor import BasicForecast
+from mlpforecast.model.regressor_model import supported_regressor
+from mlpforecast.model.regressor_model import (CatBoostModel, 
+                                               XGBModel, 
+                                               LinearRegressionModel, 
+                                               LightGBMModel)
+from mlpforecast.forecaster.utils import get_latest_checkpoint
+
+class RegressorForecast(BasicForecast):
+    """
+    MLP Forecasting class for managing training, evaluation, and prediction.
+
+    Attributes:
+        hparams (dict): Hyperparameters for the MLP model.
+        model (MLPForecastModel): PyTorch model.
+        train_df (pd.DataFrame): Training DataFrame.
+        validation_df (pd.DataFrame): Validation DataFrame.
+    """
+    
+    def __init__(
+        self,
+        data_pipeline: None,
+        model_params: dict={},
+        exp_name: str = "Tanesco",
+        file_name: str = None,
+        seed: int = 42,
+        root_dir: str = "../",
+        trial=None,
+        metric: str = "val_mae",
+        model_type: str = "CATBOOST",
+        rich_progress_bar: bool = True,
+    ):
+        """
+        MLP Forecasting class for managing training, evaluation, and prediction.
+
+        Args:
+            hparams (dict): Hyperparameters for the MLP model.
+            exp_name (str, optional): Experiment name. Defaults to "Tanesco".
+            file_name (str, optional): Name of the file for logging and saving checkpoints. Defaults to None.
+            seed (int, optional): Random seed for reproducibility. Defaults to 42.
+            root_dir (str, optional): Root directory for the project. Defaults to "../".
+            trial (optuna.trial, optional): Optuna trial object for hyperparameter optimization. Defaults to None.
+            metric (str, optional): Metric to monitor during training. Defaults to "val_mae".
+            max_epochs (int, optional): Maximum number of epochs for training. Defaults to 10.
+            wandb (bool, optional): Whether to use Weights and Biases for logging. Defaults to False.
+            model_type (str, optional): Type of the model. Defaults to "MLPF".
+            gradient_clip_val (float, optional): Value for gradient clipping. Defaults to 10.0.
+            rich_progress_bar (bool, optional): Whether to use rich progress bar. Defaults to True.
+        """
+        super().__init__(
+            exp_name=exp_name,
+            file_name=file_name,
+            seed=seed,
+            root_dir=root_dir,
+            trial=trial,
+            metric=metric,
+            model_type=model_type,
+        )
+        
+        if model_type=='CATBOOST':
+            self.model=CatBoostModel(seed=seed, 
+                                     model_params=model_params,
+                                     data_pipeline=data_pipeline)
+        elif model_type=='XGBOOST':
+            self.model=XGBModel(seed=seed, 
+                                     model_params=model_params,
+                                     data_pipeline=data_pipeline)
+        elif model_type=='LightGBM':
+            self.model=LightGBMModel(seed=seed, 
+                                     model_params=model_params,
+                                     data_pipeline=data_pipeline)
+        elif model_type=='LinearReg':
+            self.model=LinearRegressionModel(seed=seed, 
+                                     model_params=model_params,
+                                     data_pipeline=data_pipeline)
+        else:
+            raise ValueError(f"Unsupported model_type: {model_type}. Choose from {supported_regressor}.")
+
+
+    
+    def auto_tune(self, train_df, val_df, num_trial=10, reduction_factor=3, patience=2):
+        """
+        Perform hyperparameter tuning using Optuna.
+
+        Args:
+            train_df (pd.DataFrame): Training DataFrame.
+            val_df (pd.DataFrame): Validation DataFrame.
+            num_trial (int, optional): Number of trials for hyperparameter optimization. Defaults to 10.
+            reduction_factor (int, optional): Reduction factor for Hyperband pruner. Defaults to 3.
+            patience (int, optional): Patience for the Patient pruner. Defaults to
+        """
+        self.train_df = train_df
+        self.validation_df = val_df
+
+        def print_callback(study, trial):
+            logging.info(f"""Trial No: {trial.number}, Current value: {trial.value}, Current params: {trial.params}""")
+            logging.info(f"""Best value: {study.best_value}, Best params: {study.best_trial.params}""")
+
+        def objective(trial):
+            
+            params = self.model.get_search_params(trial)
+
+            self.hparams.update(params)
+            model = RegressorForecast(
+                self.hparams,
+                exp_name=f"{self.exp_name}",
+                seed=42,
+                trial=trial,
+                rich_progress_bar=True,
+                file_name=trial.number,
+            )
+
+            val_cost = model.fit(self.train_df, self.validation_df)
+            return val_cost
+
+        
+        study_name = f"{self.exp_name}_{self.model_type}"
+        storage = optuna.storages.JournalStorage(
+            optuna.storages.journal.JournalFileBackend(f"{self.logs}/{study_name}.log")
+        )
+        base_pruner = optuna.pruners.HyperbandPruner(
+            min_resource=1, max_resource="auto", reduction_factor=reduction_factor
+        )
+        pruner = optuna.pruners.PatientPruner(base_pruner, patience=patience, min_delta=0.0)
+        study = optuna.create_study(
+            direction="minimize",
+            pruner=pruner,
+            study_name=study_name,
+            storage=storage,
+            load_if_exists=True,
+        )
+        study.optimize(
+            objective,
+            n_trials=num_trial,  # Default to 100 trials if not specified
+            callbacks=[print_callback],
+        )
+        self.hparams.update(study.best_trial.params)
+        np.save(f"{self.results_path}/best_params.npy", study.best_trial.params)
+
+
+    
+
+
+
+
+    
+
+
+
+
+
