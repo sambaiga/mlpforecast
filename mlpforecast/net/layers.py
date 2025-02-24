@@ -145,6 +145,7 @@ class MLPBlock(nn.Module):
         # Create a ModuleList to store the layers
         self.mlp_network = nn.ModuleList(layers)
 
+
     def forward(self, x):
         """
         Forward pass of the MLP block.
@@ -244,6 +245,7 @@ class PastFutureEncoder(nn.Module):
         elif embedding_type == "CombinedEmb":
             self.pos_embedding = PosEmbedding(n_channels, embedding_size, window_size=context_size)
             self.rotary_embedding = RotaryEmbedding(embedding_size)
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -432,6 +434,7 @@ class MLPForecastNetwork(nn.Module):
             pred = self(x)
 
         return {"pred": pred}
+
 
     def compute_combined_projection_feature(self, x):
         """

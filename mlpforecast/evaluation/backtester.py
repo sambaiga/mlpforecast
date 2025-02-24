@@ -107,6 +107,7 @@ class TimeSeriesSplitter:
             if self.date_col not in self.df.columns:
                 raise ValueError("date_col not found in df provided.")
 
+
     def _set_split_scheme(self):
         """Set meta data of ways to split train and test set"""
         test_end_min = self.min_train_len - 1
@@ -133,11 +134,15 @@ class TimeSeriesSplitter:
         self._split_scheme = split_scheme
         self.n_splits = len(split_scheme)
 
+
     def get_scheme(self):
         return deepcopy(self._split_scheme)
 
+
     def split(self):
         """
+        Generator to yield train and test set for each split
+        
         Returns
         -------
         iterables with (train_df, test_df, scheme, split_key) where

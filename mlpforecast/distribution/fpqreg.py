@@ -50,6 +50,19 @@ class QuantileProposal(nn.Module):
         
 
     def forward(self, z):
+        """
+        Forward pass through the quantile proposal network.
+        
+        Parameters:
+        -----------
+        z: torch.Tensor
+            Input tensor.
+            
+        Returns:
+        --------
+        tuple: Taus, tau_hats, and entropies.
+        """
+        
         batch_size = z.shape[0]
         
         z_out = self.dropout(self.net(z)).reshape(batch_size, self.N, 1)
@@ -59,9 +72,6 @@ class QuantileProposal(nn.Module):
         
         tau_0 = torch.repeat_interleave(self.tau_0, batch_size, dim=0)
         taus_1_N = torch.cumsum(probs, dim=1)
-
-        
-
 
         # Calculate \tau_i (i=0,...,N).
         taus = torch.cat((tau_0, taus_1_N), dim=1)

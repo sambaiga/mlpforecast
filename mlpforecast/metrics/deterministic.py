@@ -104,6 +104,19 @@ def get_pointwise_metrics(pred: np.array, true: np.array, target_range: float = 
 
 
 def get_daily_pointwise_metrics(pred: np.array, true: np.array, target_range: float):
+    """
+    Calculate daily pointwise metrics
+    
+    Args:
+    -----
+        pred (np.array): predicted values
+        true (np.array): true values
+        target_range (float): range of the target variable
+        
+    Returns:
+    --------
+        metrics (dict): daily pointwise metrics
+    """
     assert pred.ndim == 1, "pred must be 1-dimensional"
     assert true.ndim == 1, "pred must be 1-dimensional"
     assert pred.shape == true.shape, "pred and true must have the same shape"
@@ -119,6 +132,7 @@ def evaluate_point_forecast(outputs):
     Evaluates point forecasts by computing daily pointwise metrics.
 
     Args:
+    -----
         outputs (dict): A dictionary containing the true values, predicted values, and associated metadata.
             Expected keys:
                 'true' (ndarray): The true values.
@@ -127,6 +141,7 @@ def evaluate_point_forecast(outputs):
                 'targets' (list): The names of the target variables.
 
     Returns:
+    --------
         (tuple): A tuple containing:
             - pd_metrics (dict): DataFrame of combined metrics for each target variable.
             - split_metrics (dict): Dictionary of metrics split by target variable.

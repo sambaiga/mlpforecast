@@ -70,6 +70,7 @@ class MLPQRForecastNetwork(MLPForecastNetwork):
         z = self.compute_combined_projection_feature(x)
         return self.qrnet(z)
 
+
     def step(self, batch: tuple, metric_fn: callable) -> tuple:
         """
         Training step for the MLPQRForecastNetwork.
@@ -84,6 +85,7 @@ class MLPQRForecastNetwork(MLPForecastNetwork):
         x, y = batch
         z = self.compute_combined_projection_feature(x)
         return self.qrnet.step(z, y, metric_fn)
+
 
     def forecast(self, x):
         """

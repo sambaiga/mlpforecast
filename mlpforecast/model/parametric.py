@@ -121,6 +121,7 @@ class MLPLaplaceForecastModel(BaseForecastModel):
             num_attention_heads=num_attention_heads
         )
     
+    
     def forecast(self, x):
         """
         Generate forecast for the given input.
@@ -133,6 +134,7 @@ class MLPLaplaceForecastModel(BaseForecastModel):
         """
         return self.model.forecast(x)
 
+
     def forward(self, x):
         """
         Forward pass through the model.
@@ -144,6 +146,7 @@ class MLPLaplaceForecastModel(BaseForecastModel):
             tensor: Output of the model.
         """
         return self.model(x)
+    
     
     def sample(self, x, num_samples=500):
         """

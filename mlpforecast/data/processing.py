@@ -3,6 +3,8 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from astral import LocationInfo
+from astral.sun import sun
 
 
 def _validate_target_series(target_series: list[str] | str) -> list[str]:
@@ -137,6 +139,86 @@ def loadData(
     data = data.resample(a_period).mean()
     # data = resample(data, rate=a_period, short_rate='T', max_gap="30T")
 
+    return data
+
+
+def get_sunrise_sunset(start_date: str, end_date: str, latitude: float, longitude: float):
+    """
+    Get the sunrise and sunset times for a given location and a given period of time.
+    
+    Parameters
+    ----------
+    start_date : str
+        The start date of the year. Format: "YYYY-MM-DD".
+    end_date : str
+        The end date of the year. Format: "YYYY-MM-DD".
+    latitude : float
+        The latitude of the location. Default is 32.738274.
+    longitude : float
+        The longitude of the location. Default is -16.738519.
+        
+    Returns
+    -------
+    dict
+        A dictionary with the sunrise and sunset times for 
+    """
+    
+    location = LocationInfo(latitude=latitude, longitude=longitude)
+    
+    days = pd.date_range(start=start_date, end=end_date, freq='D')
+    sunrises = []
+    sunsets = []
+    
+    for current_date in days:
+        s = sun(location.observer, date=current_date)
+        sunrises.append(s['sunrise'])
+        sunsets.append(s['sunset'])
+    
+    df = pd.DataFrame({
+        "date": days.date,
+        "sunrise": sunrises,
+        "sunset": sunsets
+    })
+    
+    return df.set_index("date").to_dict(orient="index")
+
+
+def add_day_night_feature(data: pd.DataFrame, latitude: float, longitude: float):
+    """
+    Add a day/night feature to the dataset.
+    
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The input dataset with a datetime index.
+    latitude : float
+        The latitude of the location. Default is 32.738274.
+    longitude : float
+        The longitude of the location. Default is -16.738519.
+    
+    Returns
+    -------
+    pd.DataFrame
+        The input dataset with a new "day_night" feature.
+    """
+    
+    min_date = data.index.min().date()
+    max_date = data.index.max().date()
+    
+    sunrise_sunset = get_sunrise_sunset(min_date, max_date, latitude, longitude)
+    
+    day_night = []
+    
+    for index, row in data.iterrows():
+        sunrise = sunrise_sunset[index.date()]["sunrise"]
+        sunset = sunrise_sunset[index.date()]["sunset"]
+        
+        if sunrise <= index.time() <= sunset:
+            day_night.append(1)
+        else:
+            day_night.append(0)
+    
+    data["day_night"] = day_night
     return data
 
 

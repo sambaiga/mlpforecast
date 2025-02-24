@@ -106,12 +106,30 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         self.exog_periods = None
         self.data_pipeline = self._build_pipeline()
 
+
     def _build_pipeline(self) -> Pipeline:
+        """
+        Build the pipeline for the dataset objective.
+        
+        Returns
+        -------
+        Pipeline
+            The pipeline that can extract features and do the scaling of the data.
+        """
         feature_pipeline = self._build_feature_pipeline()
         data_pipeline = self._build_data_pipeline()
         return Pipeline(steps=[("feature_extraction", feature_pipeline), ("scaling", data_pipeline)])
 
+
     def _build_feature_pipeline(self) -> Pipeline:
+        """
+        Build the feature pipeline for the dataset objective.
+        
+        Returns
+        -------
+        Pipeline
+            The feature pipeline.
+        """
         steps = []
 
         if self.lags:
@@ -144,7 +162,16 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         steps.append(("dropnan_step", FunctionTransformer(drop_na)))
         return Pipeline(steps=steps)
 
+
     def _build_data_pipeline(self) -> ColumnTransformer:
+        """
+        Build the data pipeline for the dataset objective.
+        
+        Returns
+        -------
+        ColumnTransformer
+            The data pipeline.
+        """
         transformers = []
         if self.unknown_features or self.known_continuous_features:
             numerical_features = self.unknown_features + self.known_continuous_features
@@ -169,9 +196,15 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         data_pipeline.set_output(transform="pandas")
         return data_pipeline
 
+
     def fit(self, data, y=None):
         """
         Fit the data pipeline to the given data.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data to fit the pipeline to.
         """
         self.data_pipeline.fit(data)
         if self.calendar_variables:
@@ -179,9 +212,22 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             self.exog_periods = [len(np.unique(exog[:, size])) for size in range(exog.shape[-1])]
         return self
 
+
     def transform(self, data):
         """
         Transform the data using the fitted pipeline.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data to transform.
+            
+        Returns
+        -------
+        features : np.ndarray
+            The transformed features.
+        targets : np.ndarray
+            The transformed targets.
         """
         data_transformed = self.data_pipeline.transform(data.copy())
         data_transformed = data_transformed.sort_values(by=self.date_column)
@@ -197,6 +243,7 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         self.data = data_transformed
         return features, targets
 
+
     def _add_fourier_features(self, data_transformed):
         exog = data_transformed[self.calendar_variables].astype(np.float32).values
         if self.exog_periods is None:
@@ -210,7 +257,23 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             data_transformed[f"{col}-cos"] = seasonalities[:, i + 1]
             i += 2
 
+
     def _extract_features_and_targets(self, data_transformed):
+        """
+        Extract features and targets from the transformed data.
+        
+        Parameters
+        ----------
+        data_transformed : pd.DataFrame
+            The transformed data.
+            
+        Returns
+        -------
+        features : np.ndarray
+            The extracted features.
+        targets : np.ndarray
+            The extracted targets.
+        """
         features = data_transformed[self.target_series + self.unknown_features].values.astype(np.float64)
         targets = data_transformed[self.target_series].values.astype(np.float64)
         future_exogenous = data_transformed[
@@ -244,6 +307,7 @@ class DatasetObjective(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
                 target_mode=True,
             )
         return features, targets
+
 
     def _extract_future_exogenous(self, data_transformed):
         future_exogenous = data_transformed[

@@ -130,6 +130,7 @@ class MLPFQRForecastModel(BaseForecastModel):
             kappa=kappa
         )
     
+    
     def forecast(self, x):
         """
         Generate forecast for the given input.
@@ -282,26 +283,32 @@ class MLPQRForecastModel(BaseForecastModel):
             kappa=kappa
         )
     
+    
     def forecast(self, x):
         """
         Generate forecast for the given input.
 
         Args:
+        -----
             x (tensor): Input data for forecasting.
 
         Returns:
+        -------
             tensor: Forecasted values.
         """
         return self.model.forecast(x)
+
 
     def forward(self, x):
         """
         Forward pass through the model.
 
         Args:
+        -----
             x (tensor): Input data.
 
         Returns:
+        -------
             tensor: Output of the model.
         """
         return self.model(x)

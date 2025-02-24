@@ -57,6 +57,7 @@ class QRNetwork(nn.Module):
         out = self.decoder(z)
         return out.reshape(B, -1, self.forecast_horizon, self.n_out)
     
+    
     def forecast(self, z):
         """
         Forecast function to generate quantile predictions without gradient calculation.
@@ -75,6 +76,7 @@ class QRNetwork(nn.Module):
             
         return {"loc": loc, 'q_samples': quantile_hats, "taus": tau_hats}
 
+
     def forward(self, z):
         """
         Forward pass through the entire network.
@@ -87,6 +89,7 @@ class QRNetwork(nn.Module):
         """
         q_hats = self.QVN(z)
         return q_hats
+    
     
     def step(self, z, y, metric_fn, beta=0.5):
         """

@@ -137,9 +137,11 @@ class MLPForecastModel(BaseForecastModel):
         Generate forecast for the given input.
 
         Args:
+        -----
             x (tensor): Input data for forecasting.
 
         Returns:
+        -------
             (tensor): Forecasted values.
         """
         return self.model.forecast(x)
@@ -150,6 +152,7 @@ class MLPForecastModel(BaseForecastModel):
         Forward pass of the model.
 
         Args:
+        -----
             x (tensor): Input data.
         """
         return self.model(x)
@@ -160,10 +163,12 @@ class MLPForecastModel(BaseForecastModel):
         Perform a single training step.
 
         Args:
+        -----
             batch (tuple): A batch of training data.
             batch_idx (int): Index of the batch.
 
         Returns:
+        -------
             (tensor): The loss value for the batch.
         """
         loss, metric = self.model.step(batch, self.tra_metric_fcn)
@@ -177,10 +182,12 @@ class MLPForecastModel(BaseForecastModel):
         Perform a single validation step.
 
         Args:
+        -----
             batch (tuple): A batch of validation data.
             batch_idx (int): Index of the batch.
 
         Returns:
+        -------
             (tensor): The loss value for the batch.
         """
         loss, metric = self.model.step(batch, self.val_metric_fcn)
@@ -193,6 +200,7 @@ class MLPForecastModel(BaseForecastModel):
         Configure optimizers and learning rate schedulers.
 
         Returns:
+        -------
             (tuple): A tuple containing the optimizer and the scheduler.
         """
         p1 = int(self.hparams["prob_decay_1"] * self.hparams["max_epochs"])

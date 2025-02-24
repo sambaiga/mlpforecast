@@ -73,6 +73,7 @@ class LaplaceForecastNetwork(MLPForecastNetwork):
         z = self.compute_combined_projection_feature(x)
         return self.parametric_net(z)
 
+
     def step(self, batch: tuple, metric_fn: callable) -> tuple:
         """
         Training step for the network.
@@ -88,6 +89,7 @@ class LaplaceForecastNetwork(MLPForecastNetwork):
         z = self.compute_combined_projection_feature(x)
         return self.parametric_net.step(z, y, metric_fn)
 
+
     def forecast(self, x):
         """
         Generate forecasts using the network.
@@ -100,6 +102,7 @@ class LaplaceForecastNetwork(MLPForecastNetwork):
         """
         z = self.compute_combined_projection_feature(x)
         return self.parametric_net.forecast(z)
+    
     
     def sample(self, x, num_samples=500):
         """
@@ -157,6 +160,7 @@ class MCDMultForecastNetwork(MLPForecastNetwork):
         z = self.compute_combined_projection_feature(x)
         return self.parametric_net(z)
 
+
     def step(self, batch: tuple, metric_fn: callable) -> tuple:
         """
         Training step for the network.
@@ -172,6 +176,7 @@ class MCDMultForecastNetwork(MLPForecastNetwork):
         z = self.compute_combined_projection_feature(x)
         return self.parametric_net.step(z, y, metric_fn)
 
+
     def forecast(self, x):
         """
         Generate forecasts using the network.
@@ -184,6 +189,7 @@ class MCDMultForecastNetwork(MLPForecastNetwork):
         """
         z = self.compute_combined_projection_feature(x)
         return self.parametric_net.forecast(z)
+    
     
     def sample(self, x, num_samples=500):
         """

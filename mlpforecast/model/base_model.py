@@ -64,6 +64,7 @@ class BaseForecastModel(pl.LightningModule):
         self.save_hyperparameters()
         self.checkpoint_path = "./"
 
+
     def on_save_checkpoint(self, checkpoint):
         """
         Save the data pipeline to a file and add the file path to the checkpoint dictionary.
@@ -77,6 +78,7 @@ class BaseForecastModel(pl.LightningModule):
         # Add the pipeline file path to the checkpoint dictionary
         checkpoint["data_pipeline_path"] = data_pipeline_path
 
+
     def on_load_checkpoint(self, checkpoint):
         """
         Load the data pipeline from a file.
@@ -85,6 +87,7 @@ class BaseForecastModel(pl.LightningModule):
             checkpoint (dict): Checkpoint dictionary.
         """
         self.data_pipeline = joblib.load(checkpoint["data_pipeline_path"])
+
 
     def training_step(self, batch, batch_idx):
         """
@@ -103,6 +106,7 @@ class BaseForecastModel(pl.LightningModule):
         self.log(f"train_{self.hparams['metric']}", metric, prog_bar=True, logger=True)
         return loss
 
+
     def validation_step(self, batch, batch_idx):
         """
         Perform a single validation step.
@@ -118,6 +122,7 @@ class BaseForecastModel(pl.LightningModule):
         loss, metric = self.model.step(batch, self.val_metric_fcn)
         self.log("val_loss", loss, prog_bar=True, logger=True)
         self.log(f"val_{self.hparams['metric']}", metric, prog_bar=True, logger=True)
+
 
     def configure_optimizers(self):
         """

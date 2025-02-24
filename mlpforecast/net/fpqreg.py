@@ -95,6 +95,7 @@ class MLPFQRForecastNetwork(MLPForecastNetwork):
             out_activation_function=self.out_activation,
         )
 
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass through the MLPFQRForecastNetwork.
@@ -107,6 +108,7 @@ class MLPFQRForecastNetwork(MLPForecastNetwork):
         """
         z = self.compute_combined_projection_feature(x)
         return self.fpqrnet(z)
+
 
     def step(self, batch: tuple, metric_fn: callable) -> tuple:
         """
@@ -122,6 +124,7 @@ class MLPFQRForecastNetwork(MLPForecastNetwork):
         x, y = batch
         z = self.compute_combined_projection_feature(x)
         return self.fpqrnet.step(z, y, metric_fn)
+
 
     def forecast(self, x: torch.Tensor) -> dict:
         """
