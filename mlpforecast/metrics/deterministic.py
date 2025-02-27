@@ -74,9 +74,12 @@ def get_pointwise_metrics(pred: np.array, true: np.array, target_range: float = 
     assert true.ndim == 1, "pred must be 1-dimensional"
     assert pred.shape == true.shape, "pred and true must have the same shape"
     target_range = true.max() - true.min() if target_range is None else target_range
+    
+    pred = np.nan_to_num(pred, nan=0.0)
+    true = np.nan_to_num(true, nan=0.0)
 
-    mse = mean_squared_error(true, pred)
-    rmse = np.sqrt(mean_squared_error(true, pred))
+    mse = np.square((true-pred))
+    rmse = np.sqrt(mse).mean()
     nrmse = min(rmse / target_range, 1)
     mae = mean_absolute_error(true, pred)
     mape = mean_absolute_percentage_error(true, pred)
@@ -89,7 +92,7 @@ def get_pointwise_metrics(pred: np.array, true: np.array, target_range: float = 
     smape = get_smape(true, pred)
 
     return {
-        "MSE": mse,
+        "MSE": mse.mean(),
         "RMSE": rmse,
         "NRMSE": nrmse,
         "MAE": mae,
@@ -111,6 +114,7 @@ def get_daily_pointwise_metrics(pred: np.array, true: np.array, target_range: fl
     # get pointwise metrics
     metrics = get_pointwise_metrics(pred, true, target_range)
     metrics = pd.DataFrame.from_dict(metrics, orient="index").T
+    
     return metrics
 
 
@@ -150,5 +154,7 @@ def evaluate_point_forecast(outputs):
         metrics_df.insert(0, "timestamp", df.Date.dt.round("D").unique()[-1])
         pd_metrics = pd.concat([pd_metrics, metrics_df], axis=0)
     pd_metrics.set_index("timestamp", inplace=True)
+    
+    print(pd_metrics.isnull().sum())
 
     return pd_metrics

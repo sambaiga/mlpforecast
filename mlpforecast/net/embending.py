@@ -87,7 +87,10 @@ class Rotary(torch.nn.Module):
             emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
             self.cos_cached = emb.cos()[:, None, None, :]
             self.sin_cached = emb.sin()[:, None, None, :]
-
+        else:
+            self.cos_cached = self.cos_cached.to(x.device)
+            self.sin_cached = self.sin_cached.to(x.device)
+            
         cos_half = self.cos_cached.squeeze(2).permute(1, 0, 2) * x.squeeze(2).mean(-1).unsqueeze(2)
         sin_half = self.sin_cached.squeeze(2).permute(1, 0, 2) * rotate_half(x).squeeze(2).mean(-1).unsqueeze(2)
         return cos_half + sin_half
